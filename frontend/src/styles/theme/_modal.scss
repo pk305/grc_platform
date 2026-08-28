@@ -1,0 +1,5 @@
+@use 'sass:map';
+.modal-title {
+  font-size: map.get($font-sizes, 1);
+  color: $gray-800;
+}

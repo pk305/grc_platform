@@ -1,0 +1,286 @@
+"""
+Can only be resolved by authenticated users.
+
+When the condition fails, the following can be returned (following this priority):
+1) `OperationInfo`/`OperationMessage` if those types are allowed at the return type
+2) `null` in case the field is not mandatory (e.g. `String` or `[String]`)
+3) An empty list in case the field is a list (e.g. `[String]!`)
+4) An empty `Connection` in case the return type is a relay connection
+2) Otherwise, an error will be raised
+"""
+directive @isAuthenticated repeatable on FIELD_DEFINITION
+
+directive @oneOf on INPUT_OBJECT
+
+directive @requireRoles repeatable on FIELD_DEFINITION
+
+input AssignRoleInput {
+  userId: ID!
+  roleName: String!
+}
+
+union AssignRolePayload = UserType | RoleError | OperationInfo
+
+type AuthError {
+  message: String!
+}
+
+union CreateUserPayload = UserType | OperationInfo
+
+union DeleteUserPayload = UserType | OperationInfo
+
+"""role | name"""
+enum IamRoleNameEnum {
+  """Admin"""
+  admin
+
+  """CISO"""
+  ciso
+
+  """Risk Manager"""
+  risk_manager
+
+  """Auditor"""
+  auditor
+
+  """Control Owner"""
+  control_owner
+
+  """Viewer"""
+  viewer
+}
+
+input IamRoleNameEnumFilterLookup {
+  """Exact match. Filter will be skipped on `null` value"""
+  exact: IamRoleNameEnum
+
+  """Assignment test. Filter will be skipped on `null` value"""
+  isNull: Boolean
+
+  """
+  Exact match of items in a given list. Filter will be skipped on `null` value
+  """
+  inList: [IamRoleNameEnum!]
+
+  """Case-insensitive exact match. Filter will be skipped on `null` value"""
+  iExact: IamRoleNameEnum
+
+  """
+  Case-sensitive containment test. Filter will be skipped on `null` value
+  """
+  contains: IamRoleNameEnum
+
+  """
+  Case-insensitive containment test. Filter will be skipped on `null` value
+  """
+  iContains: IamRoleNameEnum
+
+  """Case-sensitive starts-with. Filter will be skipped on `null` value"""
+  startsWith: IamRoleNameEnum
+
+  """Case-insensitive starts-with. Filter will be skipped on `null` value"""
+  iStartsWith: IamRoleNameEnum
+
+  """Case-sensitive ends-with. Filter will be skipped on `null` value"""
+  endsWith: IamRoleNameEnum
+
+  """Case-insensitive ends-with. Filter will be skipped on `null` value"""
+  iEndsWith: IamRoleNameEnum
+
+  """
+  Case-sensitive regular expression match. Filter will be skipped on `null` value
+  """
+  regex: IamRoleNameEnum
+
+  """
+  Case-insensitive regular expression match. Filter will be skipped on `null` value
+  """
+  iRegex: IamRoleNameEnum
+}
+
+union LoginResult = UserType | AuthError
+
+type Mutation {
+  updateUser(data: UserUpdateInput!): UpdateUserPayload! @isAuthenticated
+  deleteUser(data: NodeInput!): DeleteUserPayload! @isAuthenticated
+  login(email: String!, password: String!): LoginResult!
+  logout: Boolean!
+  requestPasswordReset(email: String!): Boolean!
+  resetPassword(uid: String!, token: String!, newPassword: String!): ResetPasswordPayload!
+  createUser(data: UserCreateInput!): CreateUserPayload!
+  assignRole(data: AssignRoleInput!): AssignRolePayload! @requireRoles
+  revokeRole(data: AssignRoleInput!): RevokeRolePayload! @requireRoles
+}
+
+"""Input of an object that implements the `Node` interface."""
+input NodeInput {
+  id: ID!
+}
+
+input OffsetPaginationInput {
+  offset: Int! = 0
+  limit: Int
+}
+
+type OperationInfo {
+  """List of messages returned by the operation."""
+  messages: [OperationMessage!]!
+}
+
+type OperationMessage {
+  """The kind of this message."""
+  kind: OperationMessageKind!
+
+  """The error message."""
+  message: String!
+
+  """
+  The field that caused the error, or `null` if it isn't associated with any particular field.
+  """
+  field: String
+
+  """The error code, or `null` if no error code was set."""
+  code: String
+}
+
+enum OperationMessageKind {
+  INFO
+  WARNING
+  ERROR
+  PERMISSION
+  VALIDATION
+}
+
+enum Ordering {
+  ASC
+  ASC_NULLS_FIRST
+  ASC_NULLS_LAST
+  DESC
+  DESC_NULLS_FIRST
+  DESC_NULLS_LAST
+}
+
+type Query {
+  users(filters: UserFilter, order: UserOrder, pagination: OffsetPaginationInput): [UserType!]!
+  roles(filters: RoleFilter, order: RoleOrder): [RoleType!]!
+  me: UserType
+}
+
+union ResetPasswordPayload = UserType | OperationInfo
+
+union RevokeRolePayload = UserType | RoleError | OperationInfo
+
+type RoleError {
+  message: String!
+}
+
+"""Role(id, name)"""
+input RoleFilter {
+  name: IamRoleNameEnumFilterLookup
+  AND: RoleFilter
+  OR: RoleFilter
+  NOT: RoleFilter
+  DISTINCT: Boolean
+}
+
+input RoleOrder @oneOf {
+  name: Ordering
+}
+
+"""Role(id, name)"""
+type RoleType {
+  id: ID!
+  name: IamRoleNameEnum!
+}
+
+input StrFilterLookup {
+  """Exact match. Filter will be skipped on `null` value"""
+  exact: String
+
+  """Assignment test. Filter will be skipped on `null` value"""
+  isNull: Boolean
+
+  """
+  Exact match of items in a given list. Filter will be skipped on `null` value
+  """
+  inList: [String!]
+
+  """Case-insensitive exact match. Filter will be skipped on `null` value"""
+  iExact: String
+
+  """
+  Case-sensitive containment test. Filter will be skipped on `null` value
+  """
+  contains: String
+
+  """
+  Case-insensitive containment test. Filter will be skipped on `null` value
+  """
+  iContains: String
+
+  """Case-sensitive starts-with. Filter will be skipped on `null` value"""
+  startsWith: String
+
+  """Case-insensitive starts-with. Filter will be skipped on `null` value"""
+  iStartsWith: String
+
+  """Case-sensitive ends-with. Filter will be skipped on `null` value"""
+  endsWith: String
+
+  """Case-insensitive ends-with. Filter will be skipped on `null` value"""
+  iEndsWith: String
+
+  """
+  Case-sensitive regular expression match. Filter will be skipped on `null` value
+  """
+  regex: String
+
+  """
+  Case-insensitive regular expression match. Filter will be skipped on `null` value
+  """
+  iRegex: String
+}
+
+union UpdateUserPayload = UserType | OperationInfo
+
+input UserCreateInput {
+  email: String!
+  username: String!
+  password: String!
+  firstName: String! = ""
+  lastName: String! = ""
+}
+
+"""Application user. Email is the login identifier."""
+input UserFilter {
+  email: StrFilterLookup
+  lastName: StrFilterLookup
+  AND: UserFilter
+  OR: UserFilter
+  NOT: UserFilter
+  DISTINCT: Boolean
+}
+
+input UserOrder @oneOf {
+  email: Ordering
+  lastName: Ordering
+}
+
+"""Application user. Email is the login identifier."""
+type UserType {
+  roles: [RoleType!]!
+  id: ID!
+
+  """Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."""
+  username: String!
+  firstName: String!
+  lastName: String!
+  email: String!
+}
+
+"""Application user. Email is the login identifier."""
+input UserUpdateInput {
+  id: ID
+  firstName: String
+  lastName: String
+}

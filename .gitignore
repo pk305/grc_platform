@@ -1,0 +1,29 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+
+# Env files (never commit secrets; examples are fine)
+.env
+.env.local
+.env.*.local
+
+# Local tool/editor settings
+**/.claude/settings.local.json
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Databases
+*.sqlite3

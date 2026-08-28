@@ -1,0 +1,53 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Django + Strawberry GraphQL backend"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.2,<6",
+    "strawberry-graphql[cli]>=0.316",
+    "strawberry-graphql-django>=0.86",
+    "django-environ>=0.12",
+    "django-cors-headers>=4.4",
+    "psycopg[binary]>=3.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-django>=4.9",
+    "ruff>=0.9",
+    "mypy>=1.14",
+    "django-stubs[compatible-mypy]>=5.1",
+    "factory-boy>=3.3",
+    "ariadne-codegen>=0.14",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = ["**/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main", "strawberry.ext.mypy_plugin"]
+strict = true
+exclude = ["migrations/"]
+
+[tool.django-stubs]
+django_settings_module = "core.settings.local"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "core.settings.test"
+python_files = ["test_*.py"]
+addopts = "-q --reuse-db"
+
+[tool.ariadne-codegen]
+schema_path = "schema.graphql"
+queries_path = "../frontend/src/features"
+target_package_name = "api_client"
+target_package_path = "clients"
+async_client = true

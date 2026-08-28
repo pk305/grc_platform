@@ -1,0 +1,90 @@
+// pow() - Raise number to the nth power
+//
+// @param {number} $base      The base number
+// @param {number} $exponents The exponent to which to raise $base
+@use 'sass:math';
+@use 'sass:map';
+@use 'sass:list';
+@use 'sass:meta';
+@use 'sass:string';
+@function pow($base, $exponents) {
+  $raised: 1;
+  @for $i from 1 through $exponents {
+    $raised: $raised * $base;
+  }
+  @return $raised;
+}
+@function toRem($px) {
+  $rem: math.div($px, 16);
+  @return $rem * 1rem;
+}
+
+@function mapReverse($map) {
+  $result: null;
+
+  @if meta.type-of($map) == 'map' {
+    $keys: map.keys($map);
+    $map-reversed: ();
+
+    @for $i from list.length($keys) through 1 {
+      $map-reversed: map.merge(
+        $map-reversed,
+        (
+          list.nth($keys, $i): map.get($map, list.nth($keys, $i))
+        )
+      );
+    }
+
+    @if meta.type-of($map-reversed) == 'map' {
+      $result: $map-reversed;
+    } @else {
+      @warn 'There was an error reversing the order of "#{$map}"';
+    }
+  } @else {
+    @warn '"#{$map}" is not a valid map';
+  }
+
+  @return $result;
+}
+
+@function colorToThemeColor($color) {
+}
+
+@mixin chrome-scrollbar($bg: $scrollbar-bg) {
+  overflow: auto;
+
+  &::-webkit-scrollbar {
+    visibility: hidden;
+    -webkit-appearance: none;
+    width: 6px;
+    height: 6px;
+    background-color: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    visibility: hidden;
+    border-radius: 3px;
+    background-color: $bg;
+  }
+
+  @include hover-focus {
+    &::-webkit-scrollbar,
+    &::-webkit-scrollbar-thumb {
+      visibility: visible;
+    }
+  }
+}
+
+@mixin firefox-scrollbar($bg: $scrollbar-bg) {
+  overflow: auto !important;
+  scrollbar-color: $bg transparent;
+  scrollbar-width: thin;
+}
+
+@function split-str($string, $separator) {
+  $index: string.index($string, $separator);
+
+  $str-1: string.slice($string, 1, $index - 1);
+  $str-2: string.slice($string, $index + 1);
+
+  @return $str-1 $str-2;
+}

@@ -1,0 +1,45 @@
+query Me {
+  me {
+    id
+    email
+    firstName
+    lastName
+  }
+}
+
+mutation Login($email: String!, $password: String!) {
+  login(email: $email, password: $password) {
+    __typename
+    ... on UserType {
+      id
+      email
+      firstName
+      lastName
+    }
+    ... on AuthError {
+      message
+    }
+  }
+}
+
+mutation Logout {
+  logout
+}
+
+mutation RequestPasswordReset($email: String!) {
+  requestPasswordReset(email: $email)
+}
+
+mutation ResetPassword($uid: String!, $token: String!, $newPassword: String!) {
+  resetPassword(uid: $uid, token: $token, newPassword: $newPassword) {
+    __typename
+    ... on UserType {
+      id
+    }
+    ... on OperationInfo {
+      messages {
+        message
+      }
+    }
+  }
+}
