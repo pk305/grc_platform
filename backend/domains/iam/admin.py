@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import LoginAttempt, Role, User
+from .models import IamAuditEvent, LoginAttempt, Permission, Role, User
 
 
 @admin.register(User)
@@ -15,13 +15,19 @@ class UserAdmin(DjangoUserAdmin):
         "is_staff",
         "is_active",
         "auth_provider",
+        "department",
+        "mfa_enabled",
     )
-    list_filter = (*DjangoUserAdmin.list_filter, "auth_provider")
+    list_filter = (*DjangoUserAdmin.list_filter, "auth_provider", "department", "mfa_enabled")
     filter_horizontal = (*DjangoUserAdmin.filter_horizontal, "roles")
     fieldsets = (
         *DjangoUserAdmin.fieldsets,
         ("Roles", {"fields": ("roles",)}),
-        ("SSO", {"fields": ("auth_provider",)}),
+        ("SSO", {"fields": ("auth_provider", "entra_object_id")}),
+        (
+            "Identity governance",
+            {"fields": ("department", "mfa_enabled", "next_access_review_date")},
+        ),
     )
 
 
@@ -35,3 +41,17 @@ class LoginAttemptAdmin(admin.ModelAdmin):
     list_display = ("email", "user", "success", "created_at")
     list_filter = ("success",)
     readonly_fields = ("email", "user", "success", "created_at")
+
+
+@admin.register(Permission)
+class PermissionAdmin(admin.ModelAdmin):
+    list_display = ("resource", "action", "iso_clause")
+    list_filter = ("resource", "action")
+    filter_horizontal = ("roles",)
+
+
+@admin.register(IamAuditEvent)
+class IamAuditEventAdmin(admin.ModelAdmin):
+    list_display = ("event_type", "actor", "target_user", "detail", "created_at")
+    list_filter = ("event_type",)
+    readonly_fields = ("event_type", "actor", "target_user", "detail", "created_at")

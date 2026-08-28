@@ -50,8 +50,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           appearance="light"
           accentColor="blue"
           grayColor="slate"
-          radius="medium"
+          radius="small"
           hasBackground={false}
+          panelBackground="solid"
         >
           <ApolloProviderWrapper>
             <AuthProvider>

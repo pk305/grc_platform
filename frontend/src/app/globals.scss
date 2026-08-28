@@ -15,3 +15,48 @@
   padding-left: 1rem;
   padding-right: 1rem;
 }
+
+// DataTables (datatables.net) "display" theme: bordered rows, zebra
+// striping, and a hover highlight on the current row.
+.dt-table {
+  width: 100%;
+  --table-border-radius: 0;
+
+  thead tr {
+    border-bottom: 2px solid var(--gray-a6);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--gray-a4);
+  }
+
+  tbody tr:nth-child(odd) {
+    background-color: var(--gray-a2);
+  }
+
+  tbody tr:hover {
+    background-color: var(--accent-a3);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.skeleton {
+  display: block;
+  border-radius: var(--radius-2);
+  background: linear-gradient(
+    100deg,
+    var(--gray-a3) 30%,
+    var(--gray-a4) 50%,
+    var(--gray-a3) 70%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}

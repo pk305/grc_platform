@@ -1,14 +1,8 @@
 'use client';
 
-import {
-  Box,
-  Card,
-  Flex,
-  Grid,
-  Heading,
-  Spinner,
-  Text
-} from '@radix-ui/themes';
+import { Box, Card, Flex, Grid, Heading, Text } from '@radix-ui/themes';
+import { Skeleton } from '@/components/ui';
+import { PageTitle } from '@/components/common/PageTitle';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { RiskProfileBar } from '@/components/dashboard/RiskProfileBar';
 import {
@@ -50,14 +44,48 @@ export default function DashboardPage() {
 
   if (meLoading) {
     return (
-      <Flex align="center" justify="center" style={{ minHeight: '100vh' }}>
-        <Spinner size="3" />
-      </Flex>
+      <Box px={{ initial: '4', lg: '6' }} className="box-wrapper">
+        <PageTitle title="Dashboard" />
+        <Flex direction="column" gap="5">
+          <Box>
+            <Skeleton width="180px" height="28px" mb="2" />
+            <Skeleton width="260px" height="16px" />
+          </Box>
+
+          <Grid columns={{ initial: '1', sm: '2', xl: '4' }} gap="3">
+            {Array.from({ length: 4 }, (_, i) => (
+              <Card key={i} size="2">
+                <Skeleton width="60%" height="14px" mb="3" />
+                <Skeleton width="40%" height="24px" />
+              </Card>
+            ))}
+          </Grid>
+
+          <Grid columns={{ initial: '1', lg: '2' }} gap="3">
+            <Card size="2">
+              <Skeleton width="180px" height="20px" mb="3" />
+              <Skeleton width="100%" height="120px" />
+            </Card>
+            <Card size="2">
+              <Skeleton width="180px" height="20px" mb="3" />
+              <Flex direction="column" gap="3">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <Flex key={i} justify="between">
+                    <Skeleton width="55%" height="14px" />
+                    <Skeleton width="15%" height="14px" />
+                  </Flex>
+                ))}
+              </Flex>
+            </Card>
+          </Grid>
+        </Flex>
+      </Box>
     );
   }
 
   return (
     <Box px={{ initial: '4', lg: '6' }} className="box-wrapper">
+      <PageTitle title="Dashboard" />
       <Flex direction="column" gap="5">
         <Box>
           <Heading as="h2" size="6" mb="0">
@@ -127,7 +155,7 @@ export default function DashboardPage() {
               Risk profile (residual)
             </Heading>
             {riskLoading ? (
-              <Spinner size="2" />
+              <Skeleton width="100%" height="24px" />
             ) : (
               <RiskProfileBar profile={riskSummary?.profile ?? []} />
             )}

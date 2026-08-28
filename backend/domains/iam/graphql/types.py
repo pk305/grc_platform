@@ -1,8 +1,10 @@
+import datetime
+
 import strawberry
 import strawberry_django
 from strawberry import auto
 
-from domains.iam.models import Role, User
+from domains.iam.models import Permission, Role, User
 
 
 @strawberry_django.type(Role, fields=["id", "name"])
@@ -22,7 +24,22 @@ class RoleFilter:
 
 @strawberry_django.type(
     User,
-    fields=["id", "email", "username", "first_name", "last_name", "is_active", "auth_provider"],
+    fields=[
+        "id",
+        "email",
+        "username",
+        "first_name",
+        "last_name",
+        "is_active",
+        "is_superuser",
+        "auth_provider",
+        "entra_object_id",
+        "department",
+        "mfa_enabled",
+        "next_access_review_date",
+        "last_login",
+        "date_joined",
+    ],
 )
 class UserType:
     roles: list[RoleType]
@@ -60,14 +77,27 @@ class UserCreateInput:
     last_name: str = ""
 
 
-@strawberry_django.partial(User)
-class UserUpdateInput:
-    id: auto
-    first_name: auto
-    last_name: auto
-
-
 @strawberry.input
 class AssignRoleInput:
     user_id: strawberry.ID
     role_name: str
+
+
+@strawberry_django.type(Permission, fields=["id", "resource", "action", "iso_clause"])
+class PermissionType:
+    roles: list[RoleType]
+
+
+@strawberry_django.order_type(Permission)
+class PermissionOrder:
+    resource: auto
+    action: auto
+
+
+@strawberry.type
+class AuditEventType:
+    id: str
+    event_type: str
+    actor: str
+    detail: str
+    created_at: datetime.datetime

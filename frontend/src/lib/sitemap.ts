@@ -14,5 +14,15 @@ export const sitemap: SitemapPage[] = [
     pages: [
       { name: 'Risk Register', icon: 'alert-triangle', path: '/risk-register' }
     ]
+  },
+  {
+    label: 'administration',
+    pages: [
+      { name: 'Overview', icon: 'grid', path: '/iam' },
+      { name: 'Users', icon: 'users', path: '/iam/users' },
+      { name: 'Roles', icon: 'shield', path: '/iam/roles' },
+      { name: 'Permissions', icon: 'key', path: '/iam/permissions' },
+      { name: 'Audit Log', icon: 'file-text', path: '/iam/audit-log' }
+    ]
   }
 ];

@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { Button, TextField } from '@/components/ui';
 import AcentriaLogo from '@/components/common/AcentriaLogo';
 import AuthShowcasePanel from '@/components/auth/AuthShowcasePanel';
+import { PageTitle } from '@/components/common/PageTitle';
 
 const ALLOWED_EMAIL_DOMAIN = 'acentriagroup.com';
 const SSO_REDIRECT_URL = '/api/auth/sso/entra';
@@ -98,6 +99,7 @@ export default function SsoPage() {
 
   return (
     <div className="d-flex min-vh-100 overflow-hidden">
+      <PageTitle title="Single Sign-On" />
       <div
         className="d-flex flex-column justify-content-center position-relative bg-white flex-grow-1"
         style={{ flex: '1 1 45%' }}

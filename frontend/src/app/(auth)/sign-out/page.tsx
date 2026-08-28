@@ -1,5 +1,10 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import AuthShell from '@/components/auth/AuthShell';
+
+export const metadata: Metadata = {
+  title: 'Sign out · Phoenix'
+};
 
 export default function SignOutPage() {
   return (

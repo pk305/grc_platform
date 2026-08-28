@@ -12,6 +12,8 @@ export interface AuthUser {
   email: string;
   firstName: string;
   lastName: string;
+  isSuperuser: boolean;
+  roles: { id: string; name: string }[];
 }
 
 interface LoginResult {
@@ -23,6 +25,8 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  isSuperuser: boolean;
   login: (email: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
 }
@@ -62,9 +66,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await client.clearStore();
   }, [logoutMutation, client]);
 
+  const isAdmin = user?.roles.some(role => role.name === 'admin') ?? false;
+  const isSuperuser = user?.isSuperuser ?? false;
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, isAuthenticated: Boolean(user), login, logout }}
+      value={{
+        user,
+        loading,
+        isAuthenticated: Boolean(user),
+        isAdmin,
+        isSuperuser,
+        login,
+        logout
+      }}
     >
       {children}
     </AuthContext.Provider>

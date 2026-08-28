@@ -14,6 +14,7 @@ import {
   Text,
   TextField
 } from '@radix-ui/themes';
+import { PageTitle } from '@/components/common/PageTitle';
 import { DataGrid } from '@/components/data-grid/DataGrid';
 import { createAppColumnHelper } from '@/lib/data-grid/table';
 import {
@@ -244,6 +245,7 @@ export default function RiskRegisterPage() {
 
   return (
     <Box px={{ initial: '4', lg: '6' }}>
+      <PageTitle title="Risk Register" />
       <Flex direction="column" gap="5">
         <Flex justify="between" align="end" wrap="wrap" gap="3">
           <Box>

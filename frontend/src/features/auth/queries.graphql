@@ -4,6 +4,11 @@ query Me {
     email
     firstName
     lastName
+    isSuperuser
+    roles {
+      id
+      name
+    }
   }
 }
 

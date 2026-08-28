@@ -170,6 +170,16 @@ export default function LoginForm() {
         >
           <div className="d-flex flex-column align-items-center mb-4">
             <AcentriaLogo width={220} priority />
+            <Text
+              size="1"
+              weight="medium"
+              color="gray"
+              mt="2"
+              style={{ letterSpacing: '0.08em', textTransform: 'uppercase' }}
+              className="mt-4"
+            >
+              Phoenix Platform
+            </Text>
           </div>
 
           <div className="mb-3">

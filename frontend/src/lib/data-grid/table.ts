@@ -7,6 +7,7 @@ import {
   filterFn_includesString,
   globalFilteringFeature,
   rowPaginationFeature,
+  rowSelectionFeature,
   rowSortingFeature,
   sortFn_alphanumeric,
   sortFn_datetime,
@@ -15,10 +16,12 @@ import {
 
 /**
  * The one feature set every data grid in this app is built on. Registering
- * search, sort, and pagination here (and nothing else — no row selection,
+ * search, sort, pagination, and row selection here (and nothing else — no
  * grouping, pinning, etc.) keeps every grid's bundle and state surface
  * limited to what the product actually uses; add a feature here only when a
- * real grid needs it.
+ * real grid needs it. Row selection is opt-in per grid via `DataGrid`'s
+ * `enableRowSelection` prop — registering the feature here just makes the
+ * checkbox column available.
  */
 export const dataGridFeatures = tableFeatures({
   rowSortingFeature,
@@ -29,7 +32,8 @@ export const dataGridFeatures = tableFeatures({
   filteredRowModel: createFilteredRowModel(),
   filterFns: { includesString: filterFn_includesString },
   rowPaginationFeature,
-  paginatedRowModel: createPaginatedRowModel()
+  paginatedRowModel: createPaginatedRowModel(),
+  rowSelectionFeature
 });
 
 export type DataGridFeatures = typeof dataGridFeatures;

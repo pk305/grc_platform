@@ -5,6 +5,7 @@ import {
   KeyboardEvent,
   Suspense,
   useId,
+  useRef,
   useState,
   type CSSProperties
 } from 'react';
@@ -14,12 +15,13 @@ import Image from 'next/image';
 import { Button, IconButton, TextField } from '@/components/ui';
 import AcentriaLogo from '@/components/common/AcentriaLogo';
 import AuthShowcasePanel from '@/components/auth/AuthShowcasePanel';
+import { PageTitle } from '@/components/common/PageTitle';
 import {
   useRequestPasswordResetMutation,
   useResetPasswordMutation
 } from '@/features/auth/__generated__/queries.generated';
 
-const MIN_PASSWORD_LENGTH = 8; // matches Django's default MinimumLengthValidator
+const MIN_PASSWORD_LENGTH = 8;
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev';
 const ALLOWED_EMAIL_DOMAIN = 'acentriagroup.com';
 
@@ -170,17 +172,18 @@ function RequestResetForm({ initialEmail }: { initialEmail: string }) {
           <TextField
             id="email"
             name="email"
-            label="Email address"
+            label="Work email"
             style={FIELD_HEIGHT_STYLE}
             type="email"
             inputMode="email"
-            placeholder="name@example.com"
+            placeholder={`name@${ALLOWED_EMAIL_DOMAIN}`}
             value={email}
             onChange={e => setEmail(e.target.value)}
             autoComplete="username"
             autoFocus
             spellCheck={false}
             maxLength={MAX_EMAIL_LENGTH}
+            helpText={`Only @${ALLOWED_EMAIL_DOMAIN} accounts are permitted.`}
             aria-describedby={error ? errorId : undefined}
             aria-invalid={Boolean(error)}
             required
@@ -197,6 +200,12 @@ function RequestResetForm({ initialEmail }: { initialEmail: string }) {
         >
           Send reset link
         </Button>
+
+        <div className="text-center pb-2">
+          <Link href="/auth/login" className="fs--1 fw-semi-bold">
+            Back to sign in
+          </Link>
+        </div>
       </form>
     </>
   );
@@ -204,16 +213,19 @@ function RequestResetForm({ initialEmail }: { initialEmail: string }) {
 
 function ResetPasswordForm({ uid, token }: { uid: string; token: string }) {
   const passwordHelpId = useId();
-  const errorId = useId();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState<
+    string | null
+  >(null);
   const [done, setDone] = useState(false);
   const [resetPassword, { loading: submitting }] = useResetPasswordMutation();
+  const errorToastRef = useRef<HTMLDivElement>(null);
 
   function handlePasswordKey(event: KeyboardEvent<HTMLInputElement>) {
     setCapsLockOn(event.getModifierState('CapsLock'));
@@ -221,15 +233,16 @@ function ResetPasswordForm({ uid, token }: { uid: string; token: string }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setPasswordError(null);
+    setConfirmPasswordError(null);
 
     const validationError = validatePassword(password);
     if (validationError) {
-      setError(validationError);
+      setPasswordError(validationError);
       return;
     }
     if (password !== confirmPassword) {
-      setError(MESSAGES.mismatch);
+      setConfirmPasswordError(MESSAGES.mismatch);
       return;
     }
 
@@ -239,12 +252,15 @@ function ResetPasswordForm({ uid, token }: { uid: string; token: string }) {
       });
       const result = data?.resetPassword;
       if (result?.__typename === 'OperationInfo') {
-        setError(result.messages[0]?.message ?? MESSAGES.invalidLink);
+        setPasswordError(result.messages[0]?.message ?? MESSAGES.invalidLink);
         return;
       }
       setDone(true);
     } catch {
-      setError(MESSAGES.unavailable);
+      if (errorToastRef.current) {
+        const { Toast } = await import('bootstrap');
+        Toast.getOrCreateInstance(errorToastRef.current).show();
+      }
     }
   }
 
@@ -268,17 +284,6 @@ function ResetPasswordForm({ uid, token }: { uid: string; token: string }) {
       </div>
 
       <form onSubmit={handleSubmit} noValidate>
-        {error && (
-          <div
-            id={errorId}
-            className="alert alert-danger py-2"
-            role="alert"
-            aria-live="assertive"
-          >
-            {error}
-          </div>
-        )}
-
         <div className="mb-3">
           <TextField
             id="new-password"
@@ -288,16 +293,15 @@ function ResetPasswordForm({ uid, token }: { uid: string; token: string }) {
             type={showPassword ? 'text' : 'password'}
             placeholder="Enter your new password"
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={e => {
+              setPassword(e.target.value);
+              if (passwordError) setPasswordError(null);
+            }}
             onKeyUp={handlePasswordKey}
             onKeyDown={handlePasswordKey}
             autoComplete="new-password"
-            aria-describedby={
-              [capsLockOn ? passwordHelpId : null, error ? errorId : null]
-                .filter(Boolean)
-                .join(' ') || undefined
-            }
-            aria-invalid={Boolean(error)}
+            aria-describedby={capsLockOn ? passwordHelpId : undefined}
+            error={passwordError}
             required
             slotEnd={
               <IconButton
@@ -334,9 +338,12 @@ function ResetPasswordForm({ uid, token }: { uid: string; token: string }) {
             type={showConfirmPassword ? 'text' : 'password'}
             placeholder="Re-enter your new password"
             value={confirmPassword}
-            onChange={e => setConfirmPassword(e.target.value)}
+            onChange={e => {
+              setConfirmPassword(e.target.value);
+              if (confirmPasswordError) setConfirmPasswordError(null);
+            }}
             autoComplete="new-password"
-            aria-invalid={Boolean(error)}
+            error={confirmPasswordError}
             required
             slotEnd={
               <IconButton
@@ -368,7 +375,34 @@ function ResetPasswordForm({ uid, token }: { uid: string; token: string }) {
         >
           Reset password
         </Button>
+
+        <div className="text-center">
+          <Link href="/auth/login" className="fs--1 fw-semi-bold">
+            Back to sign in
+          </Link>
+        </div>
       </form>
+
+      <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 5 }}>
+        <div
+          ref={errorToastRef}
+          className="toast"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+        >
+          <div className="toast-header">
+            <strong className="me-auto">Reset password</strong>
+            <button
+              className="btn-close"
+              type="button"
+              data-bs-dismiss="toast"
+              aria-label="Close"
+            />
+          </div>
+          <div className="toast-body">{MESSAGES.unavailable}</div>
+        </div>
+      </div>
     </>
   );
 }
@@ -389,6 +423,7 @@ function ResetPasswordContent() {
 export default function ResetPasswordPage() {
   return (
     <div className="d-flex min-vh-100 overflow-hidden">
+      <PageTitle title="Reset Password" />
       <div
         className="d-flex flex-column justify-content-center position-relative bg-white flex-grow-1"
         style={{ flex: '1 1 45%' }}

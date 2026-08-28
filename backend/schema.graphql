@@ -1,15 +1,3 @@
-"""
-Can only be resolved by authenticated users.
-
-When the condition fails, the following can be returned (following this priority):
-1) `OperationInfo`/`OperationMessage` if those types are allowed at the return type
-2) `null` in case the field is not mandatory (e.g. `String` or `[String]`)
-3) An empty list in case the field is a list (e.g. `[String]!`)
-4) An empty `Connection` in case the return type is a relay connection
-2) Otherwise, an error will be raised
-"""
-directive @isAuthenticated repeatable on FIELD_DEFINITION
-
 directive @oneOf on INPUT_OBJECT
 
 directive @requireRoles repeatable on FIELD_DEFINITION
@@ -29,6 +17,14 @@ input AssignRoleInput {
 
 union AssignRolePayload = UserType | RoleError | OperationInfo
 
+type AuditEventType {
+  id: String!
+  eventType: String!
+  actor: String!
+  detail: String!
+  createdAt: DateTime!
+}
+
 type AuditSummary {
   openFindingsCount: Int!
   overdueCorrectiveActionsCount: Int!
@@ -45,7 +41,55 @@ union CreateUserPayload = UserType | OperationInfo
 """Date (isoformat)"""
 scalar Date
 
+"""Date with time (isoformat)"""
+scalar DateTime
+
 union DeleteUserPayload = UserType | OperationInfo
+
+"""permission | action"""
+enum IamPermissionActionEnum {
+  """View"""
+  view
+
+  """Create"""
+  create
+
+  """Edit"""
+  edit
+
+  """Delete"""
+  delete
+
+  """Approve"""
+  approve
+
+  """Assign"""
+  assign
+}
+
+"""permission | resource"""
+enum IamPermissionResourceEnum {
+  """Users"""
+  iam_users
+
+  """Roles"""
+  iam_roles
+
+  """Risk register"""
+  risk
+
+  """Controls"""
+  controls
+
+  """Audit findings"""
+  audit
+
+  """Incidents"""
+  incidents
+
+  """Obligations"""
+  obligations
+}
 
 """role | name"""
 enum IamRoleNameEnum {
@@ -132,21 +176,17 @@ type IncidentSummary {
 union LoginResult = UserType | AuthError
 
 type Mutation {
-  updateUser(data: UserUpdateInput!): UpdateUserPayload! @isAuthenticated
-  deleteUser(data: NodeInput!): DeleteUserPayload! @isAuthenticated
   login(email: String!, password: String!): LoginResult!
   logout: Boolean!
   requestPasswordReset(email: String!): Boolean!
   resetPassword(uid: String!, token: String!, newPassword: String!): ResetPasswordPayload!
-  createUser(data: UserCreateInput!): CreateUserPayload!
+  createUser(data: UserCreateInput!): CreateUserPayload! @requireRoles
+  setUserActive(userId: ID!, isActive: Boolean!): SetUserActivePayload! @requireRoles
+  deleteUser(userId: ID!): DeleteUserPayload! @requireRoles
   assignRole(data: AssignRoleInput!): AssignRolePayload! @requireRoles
+  startAccessReview(userIds: [ID!]!): [UserType!]! @requireRoles
   revokeRole(data: AssignRoleInput!): RevokeRolePayload! @requireRoles
   createRisk(data: RiskCreateInput!): CreateRiskPayload! @requireRoles
-}
-
-"""Input of an object that implements the `Node` interface."""
-input NodeInput {
-  id: ID!
 }
 
 type ObligationSummary {
@@ -197,10 +237,28 @@ enum Ordering {
   DESC_NULLS_LAST
 }
 
+input PermissionOrder @oneOf {
+  resource: Ordering
+  action: Ordering
+}
+
+"""
+Resource/action grants held by roles — the access-control catalog (A.5.15).
+"""
+type PermissionType {
+  roles: [RoleType!]!
+  id: ID!
+  resource: IamPermissionResourceEnum!
+  action: IamPermissionActionEnum!
+  isoClause: String!
+}
+
 type Query {
   users(filters: UserFilter, order: UserOrder, pagination: OffsetPaginationInput): [UserType!]!
   roles(filters: RoleFilter, order: RoleOrder): [RoleType!]!
+  permissions(order: PermissionOrder): [PermissionType!]!
   me: UserType
+  auditEvents(limit: Int! = 50): [AuditEventType!]!
   accessSummary: AccessSummary!
   risks(order: RiskOrder): [RiskType!]!
   riskSummary: RiskSummary!
@@ -310,6 +368,8 @@ type RoleType {
   name: IamRoleNameEnum!
 }
 
+union SetUserActivePayload = UserType | OperationInfo
+
 type SoaSummary {
   controlsInScope: Int!
   implementedPercentage: Float!
@@ -363,8 +423,6 @@ input StrFilterLookup {
   iRegex: String
 }
 
-union UpdateUserPayload = UserType | OperationInfo
-
 input UserCreateInput {
   email: String!
   username: String!
@@ -392,6 +450,12 @@ input UserOrder @oneOf {
 type UserType {
   roles: [RoleType!]!
   id: ID!
+  lastLogin: DateTime
+
+  """
+  Designates that this user has all permissions without explicitly assigning them.
+  """
+  isSuperuser: Boolean!
 
   """Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."""
   username: String!
@@ -402,13 +466,11 @@ type UserType {
   Designates whether this user should be treated as active. Unselect this instead of deleting accounts.
   """
   isActive: Boolean!
+  dateJoined: DateTime!
   email: String!
   authProvider: IamUserAuthProviderEnum!
-}
-
-"""Application user. Email is the login identifier."""
-input UserUpdateInput {
-  id: ID
-  firstName: String
-  lastName: String
+  entraObjectId: String
+  department: String!
+  mfaEnabled: Boolean!
+  nextAccessReviewDate: Date
 }

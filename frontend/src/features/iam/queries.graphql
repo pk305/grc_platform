@@ -1,0 +1,132 @@
+query IamUsers {
+  users(order: { lastName: ASC }) {
+    id
+    email
+    username
+    firstName
+    lastName
+    isActive
+    authProvider
+    entraObjectId
+    department
+    mfaEnabled
+    nextAccessReviewDate
+    lastLogin
+    dateJoined
+    roles {
+      id
+      name
+    }
+  }
+}
+
+query IamRoles {
+  roles(order: { name: ASC }) {
+    id
+    name
+  }
+}
+
+query IamPermissions {
+  permissions(order: { resource: ASC }) {
+    id
+    resource
+    action
+    roles {
+      id
+      name
+    }
+  }
+}
+
+query IamAuditEvents($limit: Int) {
+  auditEvents(limit: $limit) {
+    id
+    eventType
+    actor
+    detail
+    createdAt
+  }
+}
+
+query IamAccessSummary {
+  accessSummary {
+    activeUsersCount
+    deactivatedUsersCount
+    ssoUsersCount
+    successfulSignIns24h
+    signInFailures24h
+  }
+}
+
+mutation IamCreateUser($data: UserCreateInput!) {
+  createUser(data: $data) {
+    ... on UserType {
+      id
+    }
+    ... on OperationInfo {
+      messages {
+        field
+        message
+      }
+    }
+  }
+}
+
+mutation IamSetUserActive($userId: ID!, $isActive: Boolean!) {
+  setUserActive(userId: $userId, isActive: $isActive) {
+    ... on UserType {
+      id
+      isActive
+    }
+    ... on OperationInfo {
+      messages {
+        field
+        message
+      }
+    }
+  }
+}
+
+mutation IamDeleteUser($userId: ID!) {
+  deleteUser(userId: $userId) {
+    ... on UserType {
+      id
+    }
+    ... on OperationInfo {
+      messages {
+        field
+        message
+      }
+    }
+  }
+}
+
+mutation IamAssignRole($data: AssignRoleInput!) {
+  assignRole(data: $data) {
+    ... on UserType {
+      id
+    }
+    ... on RoleError {
+      message
+    }
+  }
+}
+
+mutation IamRevokeRole($data: AssignRoleInput!) {
+  revokeRole(data: $data) {
+    ... on UserType {
+      id
+    }
+    ... on RoleError {
+      message
+    }
+  }
+}
+
+mutation IamStartAccessReview($userIds: [ID!]!) {
+  startAccessReview(userIds: $userIds) {
+    id
+    nextAccessReviewDate
+  }
+}

@@ -34,6 +34,12 @@ class User(AbstractUser):
     auth_provider = models.CharField(
         max_length=16, choices=AuthProvider.choices, default=AuthProvider.LOCAL
     )
+    entra_object_id = models.CharField(
+        "Entra object ID", max_length=64, blank=True, null=True, unique=True
+    )
+    department = models.CharField(max_length=128, blank=True, default="")
+    mfa_enabled = models.BooleanField("MFA enabled", default=False)
+    next_access_review_date = models.DateField(blank=True, null=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
@@ -62,3 +68,68 @@ class LoginAttempt(models.Model):
     def __str__(self) -> str:
         outcome = "success" if self.success else "failure"
         return f"{self.email} ({outcome})"
+
+
+class Permission(models.Model):
+    """Resource/action grants held by roles — the access-control catalog (A.5.15)."""
+
+    class Resource(models.TextChoices):
+        IAM_USERS = "iam_users", "Users"
+        IAM_ROLES = "iam_roles", "Roles"
+        RISK = "risk", "Risk register"
+        CONTROLS = "controls", "Controls"
+        AUDIT = "audit", "Audit findings"
+        INCIDENTS = "incidents", "Incidents"
+        OBLIGATIONS = "obligations", "Obligations"
+
+    class Action(models.TextChoices):
+        VIEW = "view", "View"
+        CREATE = "create", "Create"
+        EDIT = "edit", "Edit"
+        DELETE = "delete", "Delete"
+        APPROVE = "approve", "Approve"
+        ASSIGN = "assign", "Assign"
+
+    resource = models.CharField(max_length=32, choices=Resource.choices)
+    action = models.CharField(max_length=16, choices=Action.choices)
+    iso_clause = models.CharField(max_length=16, blank=True)
+    roles = models.ManyToManyField(Role, related_name="permissions", blank=True)
+
+    class Meta:
+        ordering = ["resource", "action"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["resource", "action"], name="unique_permission_resource_action"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.resource}:{self.action}"
+
+
+class IamAuditEvent(models.Model):
+    """Immutable log of identity/access administration actions (A.5.18)."""
+
+    class EventType(models.TextChoices):
+        USER_CREATED = "user.created", "User created"
+        USER_ACTIVATED = "user.activated", "User activated"
+        USER_DEACTIVATED = "user.deactivated", "User deactivated"
+        USER_DELETED = "user.deleted", "User deleted"
+        ROLE_GRANTED = "role.granted", "Role granted"
+        ROLE_REVOKED = "role.revoked", "Role revoked"
+
+    event_type = models.CharField(max_length=32, choices=EventType.choices)
+    actor = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    target_user = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    detail = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.event_type} @ {self.created_at:%Y-%m-%d %H:%M}"

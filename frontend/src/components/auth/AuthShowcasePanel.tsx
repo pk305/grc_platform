@@ -20,9 +20,14 @@ export default function AuthShowcasePanel({
         style={{ objectFit: 'cover', filter: 'grayscale(1) contrast(1.1)' }}
       />
       <p
-        className="position-absolute bottom-0 start-0 m-4 mb-5 text-white fw-bold"
+        className="position-absolute bottom-0 start-0 m-4 mb-5 text-white fw-bold d-flex align-items-center"
         style={{ fontSize: '2rem' }}
       >
+        <span
+          className="me-3"
+          data-feather="shield"
+          style={{ height: '2rem', width: '2rem' }}
+        />
         {caption}
       </p>
     </div>
