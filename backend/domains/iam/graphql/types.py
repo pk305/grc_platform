@@ -20,9 +20,21 @@ class RoleFilter:
     name: auto
 
 
-@strawberry_django.type(User, fields=["id", "email", "username", "first_name", "last_name"])
+@strawberry_django.type(
+    User,
+    fields=["id", "email", "username", "first_name", "last_name", "is_active", "auth_provider"],
+)
 class UserType:
     roles: list[RoleType]
+
+
+@strawberry.type
+class AccessSummary:
+    active_users_count: int
+    deactivated_users_count: int
+    sso_users_count: int
+    successful_sign_ins_24h: int
+    sign_in_failures_24h: int
 
 
 @strawberry_django.order_type(User)

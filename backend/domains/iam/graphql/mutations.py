@@ -18,7 +18,7 @@ from strawberry.types import Info
 from strawberry_django import mutations
 from strawberry_django.permissions import IsAuthenticated
 
-from domains.iam.models import Role, User
+from domains.iam.models import LoginAttempt, Role, User
 from domains.iam.permissions import require_roles
 
 from .types import AssignRoleInput, UserCreateInput, UserType, UserUpdateInput
@@ -47,6 +47,7 @@ class IamMutation:
         domain = email.rsplit("@", 1)[-1].lower()
         allowed_emails = {e.lower() for e in settings.ALLOWED_LOGIN_EMAILS}
         if email.lower() not in allowed_emails and domain != settings.ALLOWED_LOGIN_DOMAIN.lower():
+            await sync_to_async(LoginAttempt.objects.create)(email=email, success=False)
             return AuthError(
                 message=f"Only @{settings.ALLOWED_LOGIN_DOMAIN} accounts can sign in here."
             )
@@ -54,8 +55,10 @@ class IamMutation:
         request = info.context.request
         user = await sync_to_async(authenticate)(request, username=email, password=password)
         if user is None:
+            await sync_to_async(LoginAttempt.objects.create)(email=email, success=False)
             return AuthError(message="Invalid email or password.")
         await sync_to_async(auth_login)(request, user)
+        await sync_to_async(LoginAttempt.objects.create)(email=email, user=user, success=True)
         return user  # type: ignore[return-value]
 
     @strawberry.mutation

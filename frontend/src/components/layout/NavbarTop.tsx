@@ -33,6 +33,15 @@ export default function NavbarTop({
             <Logo textClass="d-none d-sm-block" href={null} />
           </div>
         </Link>
+        <button
+          className="btn navbar-toggler-humburger-icon navbar-vertical-toggle d-none d-lg-flex ms-auto me-2"
+          type="button"
+          aria-label="Collapse sidebar"
+        >
+          <span className="navbar-toggle-icon">
+            <span className="toggle-line" />
+          </span>
+        </button>
       </div>
       <div className="collapse navbar-collapse">
         {search && (

@@ -11,6 +11,8 @@ __pycache__/
 frontend/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo
+frontend/src/gql/graphql-types.ts
+**/__generated__/
 
 # Env files (never commit secrets; examples are fine)
 .env

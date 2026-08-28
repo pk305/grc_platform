@@ -223,10 +223,24 @@
             padding-left: 1rem;
           }
           + .content {
-            padding-left: $content-padding-x;
-            padding-right: $content-padding-x;
+            padding-left: 0rem;
+            padding-right: 0rem;
+            padding-bottom: 5rem;
             margin-left: $navbar-vertical-width;
           }
+        }
+      }
+    }
+  }
+}
+
+html.navbar-vertical-collapsed {
+  @each $item, $value in $navbar-vertical-breakpoints {
+    @include media-breakpoint-up($item) {
+      .navbar-vertical.navbar-expand-#{$item} {
+        display: none;
+        + .navbar-top + .content {
+          margin-left: 0;
         }
       }
     }

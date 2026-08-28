@@ -165,8 +165,7 @@
 /* -------------------------------------------------------------------------- */
 .content {
   min-height: calc(100vh - $footer-height);
-  padding: $content-padding-top map.get($spacers, 4) $content-padding-bottom
-    map.get($spacers, 4);
+  padding: $content-padding-top 0 $content-padding-bottom 0;
   position: relative;
   padding-bottom: $footer-height + 2;
   @include media-breakpoint-up(sm) {

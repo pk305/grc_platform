@@ -1,16 +1,31 @@
+import datetime
+
 import pytest
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.test import Client
+from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from strawberry.django.test import GraphQLTestClient
 
-from domains.iam.models import Role
+from domains.iam.models import LoginAttempt, Role, User
 
-from .factories import RoleFactory, UserFactory
+from .factories import LoginAttemptFactory, RoleFactory, UserFactory
 
 pytestmark = pytest.mark.django_db
+
+ACCESS_SUMMARY = """
+  query {
+    accessSummary {
+      activeUsersCount
+      deactivatedUsersCount
+      ssoUsersCount
+      successfulSignIns24h
+      signInFailures24h
+    }
+  }
+"""
 
 CREATE_USER = """
   mutation($data: UserCreateInput!) {
@@ -195,6 +210,38 @@ def test_reset_password_with_invalid_token_fails(gql_client: GraphQLTestClient) 
 
     assert result.errors is None
     assert result.data["resetPassword"]["messages"]
+
+
+def test_access_summary_counts_active_and_deactivated_users(
+    gql_client: GraphQLTestClient,
+) -> None:
+    UserFactory(is_active=True, auth_provider=User.AuthProvider.ENTRA_ID)
+    UserFactory(is_active=True, auth_provider=User.AuthProvider.LOCAL)
+    UserFactory(is_active=False)
+
+    result = gql_client.query(ACCESS_SUMMARY)
+
+    assert result.errors is None
+    summary = result.data["accessSummary"]
+    assert summary["activeUsersCount"] == 2
+    assert summary["deactivatedUsersCount"] == 1
+    assert summary["ssoUsersCount"] == 1
+
+
+def test_access_summary_windows_sign_ins_to_last_24h(gql_client: GraphQLTestClient) -> None:
+    LoginAttemptFactory(success=True)
+    LoginAttemptFactory(success=False)
+    stale_success = LoginAttemptFactory(success=True)
+    LoginAttempt.objects.filter(pk=stale_success.pk).update(
+        created_at=timezone.now() - datetime.timedelta(hours=25)
+    )
+
+    result = gql_client.query(ACCESS_SUMMARY)
+
+    assert result.errors is None
+    summary = result.data["accessSummary"]
+    assert summary["successfulSignIns24h"] == 1
+    assert summary["signInFailures24h"] == 1
 
 
 def test_reset_password_rejects_weak_password(gql_client: GraphQLTestClient) -> None:

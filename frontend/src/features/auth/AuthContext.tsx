@@ -5,7 +5,7 @@ import {
   useMeQuery,
   useLoginMutation,
   useLogoutMutation
-} from '@/gql/generated';
+} from './__generated__/queries.generated';
 
 export interface AuthUser {
   id: string;

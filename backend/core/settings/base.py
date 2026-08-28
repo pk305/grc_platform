@@ -29,6 +29,11 @@ INSTALLED_APPS = [
     "strawberry_django",
     # local
     "domains.iam",
+    "domains.risk",
+    "domains.controls",
+    "domains.audit",
+    "domains.incidents",
+    "domains.obligations",
 ]
 
 MIDDLEWARE = [

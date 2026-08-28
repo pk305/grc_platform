@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { Box } from '@radix-ui/themes';
 import PageHeader from '@/components/common/PageHeader';
 import { Button, TextField } from '@/components/ui';
 
@@ -19,7 +20,7 @@ export default function SsoSettingsPage() {
   }
 
   return (
-    <div>
+    <Box px={{ initial: '4', lg: '6' }}>
       <PageHeader
         title="Microsoft Entra ID SSO"
         description="Connect your organisation's Entra ID (Azure AD) app registration to enable single sign-on."
@@ -69,6 +70,6 @@ export default function SsoSettingsPage() {
           </form>
         </div>
       </div>
-    </div>
+    </Box>
   );
 }

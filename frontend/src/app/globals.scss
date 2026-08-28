@@ -1,1 +1,17 @@
 @import '../styles/theme.scss';
+
+@media (min-width: 992px) {
+  .navbar-vertical.navbar-expand-lg + .navbar-top .navbar-collapse {
+    padding-right: 1rem;
+  }
+}
+@media (min-width: 576px) {
+  .navbar-vertical + .navbar-top .navbar-collapse {
+    padding-left: 1rem;
+  }
+}
+
+.box-wrapper {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}

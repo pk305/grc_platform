@@ -13,7 +13,13 @@ const eslintConfig = [
     }
   },
   {
-    ignores: ['.next/**', 'node_modules/**', 'webpack/**', 'src/gql/generated.tsx']
+    ignores: [
+      '.next/**',
+      'node_modules/**',
+      'webpack/**',
+      'src/gql/graphql-types.ts',
+      'src/features/**/__generated__/**'
+    ]
   }
 ];
 

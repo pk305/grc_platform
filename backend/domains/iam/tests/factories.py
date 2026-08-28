@@ -1,6 +1,6 @@
 import factory
 
-from domains.iam.models import Role, User
+from domains.iam.models import LoginAttempt, Role, User
 
 
 class RoleFactory(factory.django.DjangoModelFactory):
@@ -25,3 +25,11 @@ class UserFactory(factory.django.DjangoModelFactory):
         if not create or not extracted:
             return
         self.roles.add(*extracted)
+
+
+class LoginAttemptFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = LoginAttempt
+
+    email = factory.Sequence(lambda n: f"attempt{n}@example.com")
+    success = True

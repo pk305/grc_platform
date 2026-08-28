@@ -1,0 +1,50 @@
+query RiskRegisterRisks {
+  risks(order: { title: ASC }) {
+    id
+    reference
+    title
+    description
+    source
+    event
+    consequence
+    status
+    inherentLikelihood
+    inherentImpact
+    inherentLevel
+    residualLikelihood
+    residualImpact
+    residualLevel
+    nextReviewDate
+    owner {
+      id
+      firstName
+      lastName
+      email
+    }
+  }
+}
+
+query RiskRegisterOwners {
+  users(order: { lastName: ASC }) {
+    id
+    firstName
+    lastName
+    email
+  }
+}
+
+mutation RiskRegisterCreateRisk($data: RiskCreateInput!) {
+  createRisk(data: $data) {
+    ... on RiskType {
+      id
+      reference
+      title
+    }
+    ... on OperationInfo {
+      messages {
+        field
+        message
+      }
+    }
+  }
+}

@@ -23,6 +23,12 @@ migrate:
 
 seed:
 	uv run python manage.py seed_admin
+	uv run python manage.py seed_iam_demo
+	uv run python manage.py seed_risk_demo
+	uv run python manage.py seed_controls_demo
+	uv run python manage.py seed_audit_demo
+	uv run python manage.py seed_incidents_demo
+	uv run python manage.py seed_obligations_demo
 
 PORT ?= 8000
 

@@ -204,18 +204,6 @@ export default function NavbarVertical({ className }) {
             )}
           </ul>
         </div>
-        <div className="navbar-vertical-footer">
-          <a
-            className="btn btn-link border-0 fw-semi-bold d-flex ps-0"
-            href="#!"
-          >
-            <span
-              className="navbar-vertical-footer-icon"
-              data-feather="log-out"
-            />
-            <span>Settings</span>
-          </a>
-        </div>
       </div>
     </nav>
   );

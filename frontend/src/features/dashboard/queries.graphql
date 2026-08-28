@@ -1,0 +1,56 @@
+query DashboardMe {
+  me {
+    id
+    firstName
+    lastName
+    email
+  }
+}
+
+query DashboardRiskSummary {
+  riskSummary {
+    openCount
+    overdueForReviewCount
+    profile {
+      level
+      count
+    }
+  }
+}
+
+query DashboardSoaSummary {
+  soaSummary {
+    controlsInScope
+    implementedPercentage
+  }
+}
+
+query DashboardAuditSummary {
+  auditSummary {
+    openFindingsCount
+    overdueCorrectiveActionsCount
+  }
+}
+
+query DashboardIncidentSummary {
+  incidentSummary {
+    openCount
+  }
+}
+
+query DashboardObligationSummary {
+  obligationSummary {
+    registeredCount
+    reviewsDueSoonCount
+  }
+}
+
+query DashboardAccessSummary {
+  accessSummary {
+    activeUsersCount
+    deactivatedUsersCount
+    ssoUsersCount
+    successfulSignIns24h
+    signInFailures24h
+  }
+}

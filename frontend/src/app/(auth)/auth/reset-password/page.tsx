@@ -17,7 +17,7 @@ import AuthShowcasePanel from '@/components/auth/AuthShowcasePanel';
 import {
   useRequestPasswordResetMutation,
   useResetPasswordMutation
-} from '@/gql/generated';
+} from '@/features/auth/__generated__/queries.generated';
 
 const MIN_PASSWORD_LENGTH = 8; // matches Django's default MinimumLengthValidator
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev';
