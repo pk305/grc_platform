@@ -4,7 +4,7 @@
   "private": true,
   "description": "Phoenix admin dashboard, ported to Next.js (App Router)",
   "scripts": {
-    "predev": "node scripts/kill-port.js codegen",
+    "predev": "node scripts/kill-port.js && pnpm run codegen",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

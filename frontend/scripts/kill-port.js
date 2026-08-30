@@ -9,14 +9,11 @@ function killPid(pid) {
   try {
     process.kill(pid, 'SIGKILL');
     console.log(`Killed process ${pid}`);
-  } catch {
-    // Already dead.
-  }
+  } catch {}
 }
 
-// Kill whatever is bound to the dev port.
 try {
-  const pids = execSync(`lsof -ti tcp:${port}`, { stdio: ['ignore', 'pipe', 'ignore'] })
+  const pids = execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, { stdio: ['ignore', 'pipe', 'ignore'] })
     .toString()
     .trim()
     .split('\n')
