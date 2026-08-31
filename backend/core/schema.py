@@ -5,10 +5,14 @@ from strawberry_django.optimizer import DjangoOptimizerExtension
 
 from core.graphql.search import SearchQuery
 from domains.audit.graphql.queries import AuditQuery
+from domains.chat.graphql.mutations import ChatMutation
+from domains.chat.graphql.queries import ChatQuery
 from domains.controls.graphql.queries import ControlsQuery
 from domains.iam.graphql.mutations import IamMutation
 from domains.iam.graphql.queries import IamQuery
 from domains.incidents.graphql.queries import IncidentsQuery
+from domains.notifications.graphql.mutations import NotificationsMutation
+from domains.notifications.graphql.queries import NotificationsQuery
 from domains.obligations.graphql.queries import ObligationsQuery
 from domains.risk.graphql.mutations import RiskMutation
 from domains.risk.graphql.queries import RiskQuery
@@ -22,13 +26,15 @@ class Query(
     AuditQuery,
     IncidentsQuery,
     ObligationsQuery,
+    NotificationsQuery,
+    ChatQuery,
     SearchQuery,
 ):
     pass
 
 
 @strawberry.type
-class Mutation(IamMutation, RiskMutation):
+class Mutation(IamMutation, RiskMutation, NotificationsMutation, ChatMutation):
     pass
 
 

@@ -22,9 +22,7 @@ class NotificationDismissal(models.Model):
         related_name="notification_dismissals",
     )
     key = models.CharField("notification key", max_length=64)
-    signature = models.CharField(
-        "state when cleared", max_length=128, blank=True, default=""
-    )
+    signature = models.CharField("state when cleared", max_length=128, blank=True, default="")
     dismissed_at = models.DateTimeField(auto_now=True)
 
     class Meta:

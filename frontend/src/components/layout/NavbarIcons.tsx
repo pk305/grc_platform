@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import Avatar from '@/components/common/Avatar';
 import { Button } from '@/components/ui/Button';
 import { useAuth, type AuthUser } from '@/features/auth/AuthContext';
+import { useChat } from '@/features/chat/ChatContext';
 import NotificationsDropdown, {
-  useAttentionItems
+  useNotifications
 } from './NotificationsDropdown';
 import SettingsDropdown from './SettingsDropdown';
 
@@ -88,8 +89,14 @@ function ProfileDropdown({
 
 export default function NavbarIcons() {
   const { user, logout } = useAuth();
-  const { items: attentionItems, loading: attentionLoading } =
-    useAttentionItems();
+  const {
+    items: notifications,
+    loading: notificationsLoading,
+    clearOne,
+    clearAll,
+    clearing
+  } = useNotifications();
+  const { unreadTotal, railOpen, toggleRail } = useChat();
   const router = useRouter();
 
   async function handleSignOut() {
@@ -102,10 +109,48 @@ export default function NavbarIcons() {
     }
   }
 
-  const attentionCount = attentionItems.length;
+  const attentionCount = notifications.length;
 
   return (
     <ul className="navbar-nav navbar-nav-icons ms-auto flex-row align-items-center gap-1">
+      <li className="nav-item">
+        <button
+          className="nav-link btn btn-link position-relative border-0 shadow-none"
+          type="button"
+          onClick={toggleRail}
+          aria-pressed={railOpen}
+          aria-label={
+            unreadTotal > 0
+              ? `Chat — ${unreadTotal} unread`
+              : railOpen
+                ? 'Hide contacts'
+                : 'Show contacts'
+          }
+        >
+          <span
+            className="text-700"
+            data-feather="message-circle"
+            style={ICON_SIZE}
+            aria-hidden="true"
+          />
+          {/* Mounted unconditionally for the same reason as the bell's badge:
+              feather replaces the icon beside it outside of React. */}
+          <span
+            className="position-absolute badge rounded-pill bg-danger text-white"
+            style={{
+              top: 2,
+              insetInlineEnd: 0,
+              fontSize: '0.6rem',
+              padding: '0.15rem 0.3rem'
+            }}
+            hidden={unreadTotal === 0}
+            aria-hidden="true"
+          >
+            {unreadTotal > 9 ? '9+' : unreadTotal}
+          </span>
+        </button>
+      </li>
+
       <li className="nav-item dropdown">
         <button
           id="navbarDropdownNotification"
@@ -142,8 +187,11 @@ export default function NavbarIcons() {
           </span>
         </button>
         <NotificationsDropdown
-          items={attentionItems}
-          loading={attentionLoading}
+          items={notifications}
+          loading={notificationsLoading}
+          clearOne={clearOne}
+          clearAll={clearAll}
+          clearing={clearing}
         />
       </li>
 

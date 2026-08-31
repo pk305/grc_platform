@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     "domains.audit",
     "domains.incidents",
     "domains.obligations",
+    "domains.notifications",
+    "domains.chat",
 ]
 
 MIDDLEWARE = [

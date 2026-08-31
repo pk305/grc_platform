@@ -1,141 +1,119 @@
 'use client';
 
 import Link from 'next/link';
-import { useAuth } from '@/features/auth/AuthContext';
 import {
-  useNavbarAdminAttentionQuery,
-  useNavbarAttentionQuery
+  useClearAllNotificationsMutation,
+  useClearNotificationMutation,
+  useNotificationsQuery,
+  NotificationsDocument,
+  type NotificationsQuery
 } from '@/features/navbar/__generated__/queries.generated';
 
-type Tone = 'danger' | 'warning' | 'info';
+export type NotificationItem = NotificationsQuery['notifications'][number];
 
-export interface AttentionItem {
-  key: string;
-  icon: string;
-  tone: Tone;
-  title: string;
-  detail: string;
-  href: string;
-}
+/** Falls back to a neutral icon so a new server-side key still renders. */
+const ICON_BY_KEY: Record<string, string> = {
+  mfa: 'fas fa-shield-alt',
+  'risks-overdue': 'fas fa-exclamation-triangle',
+  'actions-overdue': 'fas fa-clipboard-check',
+  'obligations-due': 'fas fa-gavel',
+  'sign-in-failures': 'fas fa-user-lock'
+};
+const FALLBACK_ICON = 'fas fa-info-circle';
 
-const TONE_CLASS: Record<Tone, string> = {
+const TONE_CLASS: Record<string, string> = {
   danger: 'text-danger',
   warning: 'text-warning',
   info: 'text-info'
 };
 
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`;
-}
-
 /**
- * Everything currently asking for the signed-in user's attention.
- *
- * Derived from the same summary counts the dashboard reads rather than from a
- * stored notification stream — so there is no read/unread state to drift out
- * of sync, and an item disappears exactly when the underlying work is done.
+ * The bell's contents. Alerts are built and worded by the server; clearing one
+ * writes a dismissal against the caller's account, so it stays cleared across
+ * devices and sessions — and comes back if the situation it describes changes.
  */
-export function useAttentionItems(): {
-  items: AttentionItem[];
-  loading: boolean;
-} {
-  const { user, isAdmin } = useAuth();
-  const { data, loading } = useNavbarAttentionQuery({
-    fetchPolicy: 'cache-and-network'
-  });
-  const { data: adminData } = useNavbarAdminAttentionQuery({
-    skip: !isAdmin,
+export function useNotifications() {
+  const { data, loading } = useNotificationsQuery({
     fetchPolicy: 'cache-and-network'
   });
 
-  const items: AttentionItem[] = [];
+  const [clearOneMutation, { loading: clearingOne }] =
+    useClearNotificationMutation();
+  const [clearAllMutation, { loading: clearingAll }] =
+    useClearAllNotificationsMutation();
 
-  if (user && !user.mfaEnabled) {
-    items.push({
-      key: 'mfa',
-      icon: 'fas fa-shield-alt',
-      tone: 'warning',
-      title: 'Two-factor authentication is off',
-      detail: 'Add a second factor to protect your account.',
-      href: '/profile#security'
+  // Both mutations return the alerts that remain, so writing that straight
+  // into the Notifications query keeps the badge and the panel in step in one
+  // round trip, with no refetch.
+  const clearOne = (key: string) =>
+    clearOneMutation({
+      variables: { key },
+      update: (cache, { data: result }) => {
+        if (!result) return;
+        cache.writeQuery({
+          query: NotificationsDocument,
+          data: { notifications: result.clearNotification }
+        });
+      }
     });
-  }
 
-  const overdueRisks = data?.riskSummary.overdueForReviewCount ?? 0;
-  if (overdueRisks > 0) {
-    items.push({
-      key: 'risks-overdue',
-      icon: 'fas fa-exclamation-triangle',
-      tone: 'danger',
-      title: `${plural(overdueRisks, 'risk')} overdue for review`,
-      detail: 'Past the scheduled review date in the register.',
-      href: '/risk-register'
+  const clearAll = () =>
+    clearAllMutation({
+      update: (cache, { data: result }) => {
+        if (!result) return;
+        cache.writeQuery({
+          query: NotificationsDocument,
+          data: { notifications: result.clearAllNotifications }
+        });
+      }
     });
-  }
 
-  const overdueActions = data?.auditSummary.overdueCorrectiveActionsCount ?? 0;
-  if (overdueActions > 0) {
-    items.push({
-      key: 'actions-overdue',
-      icon: 'fas fa-clipboard-check',
-      tone: 'danger',
-      title: `${plural(overdueActions, 'corrective action')} overdue`,
-      detail: 'Past the agreed completion date.',
-      href: '/'
-    });
-  }
-
-  const reviewsDue = data?.obligationSummary.reviewsDueSoonCount ?? 0;
-  if (reviewsDue > 0) {
-    items.push({
-      key: 'obligations-due',
-      icon: 'fas fa-gavel',
-      tone: 'warning',
-      title: `${plural(reviewsDue, 'obligation')} due for review`,
-      detail: 'Scheduled within the next 30 days.',
-      href: '/'
-    });
-  }
-
-  const failures = adminData?.accessSummary.signInFailures24h ?? 0;
-  if (isAdmin && failures > 0) {
-    items.push({
-      key: 'sign-in-failures',
-      icon: 'fas fa-user-lock',
-      tone: 'warning',
-      title: `${plural(failures, 'failed sign-in')} in 24 hours`,
-      detail: 'Review the access log for unfamiliar activity.',
-      href: '/iam/audit-log'
-    });
-  }
-
-  return { items, loading };
+  return {
+    items: data?.notifications ?? [],
+    loading,
+    clearOne,
+    clearAll,
+    clearing: clearingOne || clearingAll
+  };
 }
 
-/**
- * `items` is passed in rather than read here: the bell's badge needs the same
- * list, and calling the hook in both places would run the queries twice.
- */
 export default function NotificationsDropdown({
   items,
-  loading
+  loading,
+  clearOne,
+  clearAll,
+  clearing
 }: {
-  items: AttentionItem[];
+  items: NotificationItem[];
   loading: boolean;
+  clearOne: (key: string) => void;
+  clearAll: () => void;
+  clearing: boolean;
 }) {
   return (
     <div
       className="dropdown-menu dropdown-menu-end py-0 shadow border border-300"
-      style={{ minWidth: '20rem' }}
+      style={{ minWidth: '21rem' }}
       aria-labelledby="navbarDropdownNotification"
     >
       <div className="card position-relative border-0">
         <div className="card-header d-flex align-items-center justify-content-between border-bottom py-2 px-3">
           <h6 className="mb-0">Needs attention</h6>
           {items.length > 0 && (
-            <span className="badge rounded-pill bg-primary text-white">
-              {items.length}
-            </span>
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 fs--2 text-decoration-none"
+              // Bootstrap closes an open dropdown from a document-level click
+              // handler; keeping the event off document leaves the panel open
+              // so several alerts can be cleared in a row.
+              onClick={event => {
+                event.stopPropagation();
+                clearAll();
+              }}
+              disabled={clearing}
+            >
+              Clear all
+            </button>
           )}
         </div>
 
@@ -150,13 +128,18 @@ export default function NotificationsDropdown({
           ) : (
             <ul className="list-unstyled mb-0">
               {items.map(item => (
-                <li key={item.key} className="border-bottom">
+                <li
+                  key={item.key}
+                  className="border-bottom d-flex align-items-start"
+                >
                   <Link
                     href={item.href}
-                    className="d-flex gap-3 px-3 py-3 text-decoration-none hover-bg-200"
+                    className="d-flex gap-3 flex-grow-1 px-3 py-3 text-decoration-none hover-bg-200"
                   >
                     <span
-                      className={`${item.icon} ${TONE_CLASS[item.tone]} mt-1`}
+                      className={`${ICON_BY_KEY[item.key] ?? FALLBACK_ICON} ${
+                        TONE_CLASS[item.tone] ?? 'text-info'
+                      } mt-1`}
                       aria-hidden="true"
                     />
                     <span>
@@ -168,6 +151,18 @@ export default function NotificationsDropdown({
                       </span>
                     </span>
                   </Link>
+                  <button
+                    type="button"
+                    className="btn btn-link text-600 px-2 py-3 border-0 shadow-none"
+                    aria-label={`Clear: ${item.title}`}
+                    disabled={clearing}
+                    onClick={event => {
+                      event.stopPropagation();
+                      clearOne(item.key);
+                    }}
+                  >
+                    <span className="fas fa-times fs--1" aria-hidden="true" />
+                  </button>
                 </li>
               ))}
             </ul>

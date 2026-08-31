@@ -42,6 +42,44 @@ union BeginMfaSetupPayload = MfaSetupType | OperationInfo
 
 union ChangePasswordPayload = UserType | OperationInfo
 
+type ChatContactType {
+  id: ID!
+  participant: ChatParticipantType!
+  conversationId: ID
+  unreadCount: Int!
+  lastMessagePreview: String!
+  lastMessageAt: DateTime
+}
+
+type ChatMessageType {
+  id: ID!
+  conversationId: ID!
+  body: String!
+  createdAt: DateTime!
+  sender: ChatParticipantType!
+  mine: Boolean!
+}
+
+type ChatOpenResult {
+  conversationId: ID!
+  unreadTotal: Int!
+}
+
+type ChatParticipantType {
+  id: ID!
+  name: String!
+  email: String!
+  department: String!
+  avatarUrl: String
+  online: Boolean!
+  lastSeenAt: DateTime
+}
+
+type ChatReadResult {
+  conversationId: ID!
+  unreadTotal: Int!
+}
+
 union ConfirmMfaSetupPayload = MfaConfirmedType | OperationInfo
 
 union CreateRiskPayload = RiskType | OperationInfo
@@ -231,12 +269,26 @@ type Mutation {
   assignPermission(data: RolePermissionInput!): AssignPermissionPayload! @requireRoles
   revokePermission(data: RolePermissionInput!): RevokePermissionPayload! @requireRoles
   createRisk(data: RiskCreateInput!): CreateRiskPayload! @requireRoles
+  clearNotification(key: String!): [NotificationType!]!
+  clearAllNotifications: [NotificationType!]!
+  sendChatMessage(body: String!, conversationId: ID = null, recipientId: ID = null): ChatMessageType!
+  openChatConversation(recipientId: ID!): ChatOpenResult!
+  markChatRead(conversationId: ID!): ChatReadResult!
+  chatHeartbeat: Boolean!
 }
 
 input MyProfileInput {
   firstName: String! = ""
   lastName: String! = ""
   department: String! = ""
+}
+
+type NotificationType {
+  key: String!
+  tone: String!
+  title: String!
+  detail: String!
+  href: String!
 }
 
 type ObligationSummary {
@@ -318,6 +370,10 @@ type Query {
   auditSummary: AuditSummary!
   incidentSummary: IncidentSummary!
   obligationSummary: ObligationSummary!
+  notifications: [NotificationType!]!
+  chatContacts(search: String = null, limit: Int = null): [ChatContactType!]!
+  chatMessages(conversationId: ID!, limit: Int = null): [ChatMessageType!]!
+  chatUnreadTotal: Int!
   globalSearch(query: String!, limit: Int! = 5): [SearchResult!]!
 }
 
