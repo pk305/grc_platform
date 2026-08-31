@@ -6,10 +6,12 @@ query IamUsers {
     firstName
     lastName
     isActive
+    isSuperuser
     authProvider
     entraObjectId
     department
     mfaEnabled
+    mfaRequired
     nextAccessReviewDate
     lastLogin
     dateJoined
@@ -25,6 +27,10 @@ query IamRoles {
     id
     name
   }
+}
+
+query IamUsernameAvailable($username: String!) {
+  usernameAvailable(username: $username)
 }
 
 query IamPermissions {
@@ -63,6 +69,25 @@ mutation IamCreateUser($data: UserCreateInput!) {
   createUser(data: $data) {
     ... on UserType {
       id
+    }
+    ... on OperationInfo {
+      messages {
+        field
+        message
+      }
+    }
+  }
+}
+
+mutation IamUpdateUser($userId: ID!, $data: UserUpdateInput!) {
+  updateUser(userId: $userId, data: $data) {
+    ... on UserType {
+      id
+      email
+      username
+      firstName
+      lastName
+      department
     }
     ... on OperationInfo {
       messages {
@@ -128,5 +153,36 @@ mutation IamStartAccessReview($userIds: [ID!]!) {
   startAccessReview(userIds: $userIds) {
     id
     nextAccessReviewDate
+  }
+}
+
+mutation IamAdminResetMfa($userId: ID!) {
+  adminResetMfa(userId: $userId) {
+    ... on UserType {
+      id
+      mfaEnabled
+      mfaRequired
+    }
+    ... on OperationInfo {
+      messages {
+        field
+        message
+      }
+    }
+  }
+}
+
+mutation IamSetMfaRequired($userId: ID!, $required: Boolean!) {
+  setMfaRequired(userId: $userId, required: $required) {
+    ... on UserType {
+      id
+      mfaRequired
+    }
+    ... on OperationInfo {
+      messages {
+        field
+        message
+      }
+    }
   }
 }

@@ -5,7 +5,8 @@ import strawberry_django
 from django.utils import timezone
 from strawberry.types import Info
 
-from domains.iam.models import IamAuditEvent, LoginAttempt, User
+from domains.iam.models import IamAuditEvent, LoginAttempt, Role, User
+from domains.iam.permissions import require_roles
 
 from .types import (
     AccessSummary,
@@ -33,6 +34,10 @@ class IamQuery:
     def me(self, info: Info) -> UserType | None:
         user = info.context.request.user
         return user if user.is_authenticated else None
+
+    @strawberry_django.field(extensions=[require_roles(Role.Name.ADMIN)])
+    def username_available(self, username: str) -> bool:
+        return not User.objects.filter(username=username).exists()
 
     @strawberry_django.field
     def audit_events(self, limit: int = 50) -> list[AuditEventType]:

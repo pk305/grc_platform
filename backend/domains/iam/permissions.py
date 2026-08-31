@@ -38,7 +38,9 @@ class RequireRoles(DjangoPermissionExtension):
             not isinstance(user, User)
             or not user.is_authenticated
             or not user.is_active
-            or not user.roles.filter(name__in=self.roles).exists()
+            or not (
+                user.is_superuser or user.roles.filter(name__in=self.roles).exists()
+            )
         ):
             raise DjangoNoPermission
 

@@ -12,9 +12,11 @@ import {
   Text
 } from '@radix-ui/themes';
 import {
+  useIamAdminResetMfaMutation,
   useIamAssignRoleMutation,
   useIamDeleteUserMutation,
   useIamRevokeRoleMutation,
+  useIamSetMfaRequiredMutation,
   useIamSetUserActiveMutation
 } from '@/features/iam/__generated__/queries.generated';
 import type {
@@ -47,6 +49,9 @@ export function ManageUserDialog({
   const [assignRole] = useIamAssignRoleMutation();
   const [revokeRole] = useIamRevokeRoleMutation();
   const [deleteUser, { loading: deleting }] = useIamDeleteUserMutation();
+  const [setMfaRequired] = useIamSetMfaRequiredMutation();
+  const [adminResetMfa, { loading: resettingMfa }] =
+    useIamAdminResetMfaMutation();
 
   const heldRoleNames = new Set(user.roles.map(role => role.name));
 
@@ -86,6 +91,34 @@ export function ManageUserDialog({
         setError(payload.message);
         return;
       }
+    }
+    onChanged();
+  }
+
+  async function toggleMfaRequired(next: boolean) {
+    setError(null);
+    const result = await setMfaRequired({
+      variables: { userId: user.id, required: next },
+      refetchQueries: ['IamUsers']
+    });
+    const payload = result.data?.setMfaRequired;
+    if (payload && 'messages' in payload) {
+      setError(payload.messages.map(m => m.message).join(' '));
+      return;
+    }
+    onChanged();
+  }
+
+  async function handleResetMfa() {
+    setError(null);
+    const result = await adminResetMfa({
+      variables: { userId: user.id },
+      refetchQueries: ['IamUsers']
+    });
+    const payload = result.data?.adminResetMfa;
+    if (payload && 'messages' in payload) {
+      setError(payload.messages.map(m => m.message).join(' '));
+      return;
     }
     onChanged();
   }
@@ -161,6 +194,63 @@ export function ManageUserDialog({
                 </Flex>
               </Text>
             ))}
+          </Flex>
+
+          <Flex direction="column" gap="2">
+            <Text size="2" weight="medium">
+              Multi-factor authentication
+            </Text>
+            {user.mfaEnabled ? (
+              <Flex align="center" gap="2" wrap="wrap">
+                <Text size="2" color="green">
+                  Enabled
+                </Text>
+                <AlertDialog.Root>
+                  <AlertDialog.Trigger>
+                    <Button variant="soft" color="red" size="1">
+                      Reset MFA
+                    </Button>
+                  </AlertDialog.Trigger>
+                  <AlertDialog.Content maxWidth="420px">
+                    <AlertDialog.Title>
+                      Reset MFA for {user.email}?
+                    </AlertDialog.Title>
+                    <AlertDialog.Description size="2">
+                      This clears their authenticator enrollment and recovery
+                      codes. Use this if they&apos;ve lost their device — they
+                      will need to set up MFA again at next sign-in.
+                    </AlertDialog.Description>
+                    <Flex gap="3" mt="4" justify="end">
+                      <AlertDialog.Cancel>
+                        <Button variant="soft" color="gray">
+                          Cancel
+                        </Button>
+                      </AlertDialog.Cancel>
+                      <AlertDialog.Action>
+                        <Button
+                          color="red"
+                          onClick={handleResetMfa}
+                          loading={resettingMfa}
+                        >
+                          Reset MFA
+                        </Button>
+                      </AlertDialog.Action>
+                    </Flex>
+                  </AlertDialog.Content>
+                </AlertDialog.Root>
+              </Flex>
+            ) : (
+              <Text as="label" size="2">
+                <Flex align="center" gap="2">
+                  <Switch
+                    checked={user.mfaRequired}
+                    onCheckedChange={toggleMfaRequired}
+                    size="1"
+                  />
+                  Require MFA setup at next sign-in
+                </Flex>
+              </Text>
+            )}
           </Flex>
 
           {error && (

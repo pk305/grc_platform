@@ -5,6 +5,9 @@ query Me {
     firstName
     lastName
     isSuperuser
+    mustChangePassword
+    mfaEnabled
+    mfaRequired
     roles {
       id
       name
@@ -24,6 +27,27 @@ mutation Login($email: String!, $password: String!) {
     ... on AuthError {
       message
     }
+    ... on MfaRequired {
+      message
+    }
+  }
+}
+
+mutation VerifyMfaCode($code: String!) {
+  verifyMfaCode(code: $code) {
+    __typename
+    ... on UserType {
+      id
+      email
+      firstName
+      lastName
+    }
+    ... on AuthError {
+      message
+    }
+    ... on MfaRequired {
+      message
+    }
   }
 }
 
@@ -40,6 +64,70 @@ mutation ResetPassword($uid: String!, $token: String!, $newPassword: String!) {
     __typename
     ... on UserType {
       id
+    }
+    ... on OperationInfo {
+      messages {
+        message
+      }
+    }
+  }
+}
+
+mutation ChangePassword($oldPassword: String!, $newPassword: String!) {
+  changePassword(oldPassword: $oldPassword, newPassword: $newPassword) {
+    __typename
+    ... on UserType {
+      id
+      mustChangePassword
+    }
+    ... on OperationInfo {
+      messages {
+        message
+      }
+    }
+  }
+}
+
+mutation BeginMfaSetup {
+  beginMfaSetup {
+    __typename
+    ... on MfaSetupType {
+      secret
+      provisioningUri
+    }
+    ... on OperationInfo {
+      messages {
+        message
+      }
+    }
+  }
+}
+
+mutation ConfirmMfaSetup($code: String!) {
+  confirmMfaSetup(code: $code) {
+    __typename
+    ... on MfaConfirmedType {
+      user {
+        id
+        mfaEnabled
+        mfaRequired
+      }
+      recoveryCodes
+    }
+    ... on OperationInfo {
+      messages {
+        message
+      }
+    }
+  }
+}
+
+mutation DisableMfa($password: String!) {
+  disableMfa(password: $password) {
+    __typename
+    ... on UserType {
+      id
+      mfaEnabled
     }
     ... on OperationInfo {
       messages {

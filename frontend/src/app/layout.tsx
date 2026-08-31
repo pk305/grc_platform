@@ -4,6 +4,7 @@ import { Theme } from '@radix-ui/themes';
 import ThemeInit from '@/components/ThemeInit';
 import ApolloProviderWrapper from '@/lib/apollo/ApolloProviderWrapper';
 import { AuthProvider } from '@/features/auth/AuthContext';
+import { ToastProvider } from '@/components/common/Toast';
 import { siteConfig } from '@/lib/site-config';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import 'animate.css';
@@ -56,7 +57,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         >
           <ApolloProviderWrapper>
             <AuthProvider>
-              <main>{children}</main>
+              <ToastProvider>
+                <main>{children}</main>
+              </ToastProvider>
             </AuthProvider>
           </ApolloProviderWrapper>
         </Theme>
