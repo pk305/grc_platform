@@ -22,8 +22,6 @@ from .types import (
     UserType,
 )
 
-# Upper bound on a caller-supplied `limit`, so a single query can't ask the
-# database for the entire audit trail at once.
 MAX_AUDIT_EVENT_LIMIT = 500
 
 

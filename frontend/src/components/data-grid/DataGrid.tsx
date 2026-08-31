@@ -44,6 +44,8 @@ export interface DataGridProps<TData extends RowData> {
   }) => ReactNode;
   /** Show the search box. The grid is always registered for global filtering; this only toggles the control. */
   enableGlobalFilter?: boolean;
+  /** Search term the grid opens with — e.g. seeded from a `?q=` deep link. Uncontrolled afterwards. */
+  initialGlobalFilter?: string;
   /** Show pagination controls, the "Show N entries" menu, and the entry count. When false, all rows render on one page. */
   enablePagination?: boolean;
   pageSize?: number;
@@ -108,6 +110,7 @@ export function DataGrid<TData extends RowData>({
   enableRowSelection = false,
   renderBulkActions,
   enableGlobalFilter = true,
+  initialGlobalFilter,
   enablePagination = true,
   pageSize = 15,
   searchPlaceholder = 'Search...',
@@ -123,6 +126,7 @@ export function DataGrid<TData extends RowData>({
     enableRowSelection,
     atoms,
     initialState: {
+      globalFilter: initialGlobalFilter,
       pagination: {
         pageIndex: 0,
         pageSize: enablePagination ? pageSize : Infinity

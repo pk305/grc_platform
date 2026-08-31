@@ -318,6 +318,7 @@ type Query {
   auditSummary: AuditSummary!
   incidentSummary: IncidentSummary!
   obligationSummary: ObligationSummary!
+  globalSearch(query: String!, limit: Int! = 5): [SearchResult!]!
 }
 
 union RegenerateMfaRecoveryCodesPayload = MfaRecoveryCodesType | OperationInfo
@@ -429,6 +430,14 @@ input RolePermissionInput {
 type RoleType {
   id: ID!
   name: IamRoleNameEnum!
+}
+
+type SearchResult {
+  id: String!
+  kind: String!
+  label: String!
+  sublabel: String!
+  url: String!
 }
 
 union SetMfaRequiredPayload = UserType | OperationInfo

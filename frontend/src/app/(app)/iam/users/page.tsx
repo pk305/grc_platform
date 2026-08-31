@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Badge, Box, Flex, Grid, Heading, Text } from '@radix-ui/themes';
 import { DataGrid } from '@/components/data-grid/DataGrid';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -47,6 +48,10 @@ export default function UsersPage() {
   const roles = rolesData?.roles ?? EMPTY_ROLES;
   const summary = summaryData?.accessSummary;
   const [filter, setFilter] = useState<UserFilter>('all');
+  // Quick search in the navbar links here as ?q=<email>, so the person it
+  // matched is already filtered in when the page opens.
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get('q') ?? undefined;
 
   const activeCount =
     summary?.activeUsersCount ?? users.filter(u => u.isActive).length;
@@ -305,6 +310,7 @@ export default function UsersPage() {
 
         <DataGrid
           title="User Accounts"
+          initialGlobalFilter={initialSearch}
           data={filteredUsers}
           columns={columns}
           enableRowSelection={isAdmin}

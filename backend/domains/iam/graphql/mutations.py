@@ -462,12 +462,8 @@ class IamMutation:
                 first_name=data.first_name,
                 last_name=data.last_name,
                 department=data.department,
-                # A.8.5 — the admin can require MFA, but enrollment itself
-                # can only happen when the user signs in (see begin_mfa_setup).
                 mfa_required=data.require_mfa,
-                # A.5.17 — temporary passwords must be changed at first use.
                 must_change_password=True,
-                # A.5.18 — every new grant enters the periodic recertification cycle.
                 next_access_review_date=timezone.now().date()
                 + timedelta(days=NEW_USER_ACCESS_REVIEW_DAYS),
             )

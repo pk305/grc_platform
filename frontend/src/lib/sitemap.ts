@@ -33,3 +33,31 @@ export const sitemap: SitemapPage[] = [
     ]
   }
 ];
+
+/** A navigable page in the sitemap, with the section headings above it. */
+export interface SitemapLeaf {
+  name: string;
+  path: string;
+  /** Section headings from the top down, e.g. ['administration', 'IAM']. */
+  trail: string[];
+}
+
+/**
+ * Every real destination in the sitemap, flattened. Groups contribute their
+ * heading to the trail rather than a row of their own, and placeholders
+ * (`#!`) are dropped — this feeds quick search, which must only ever offer
+ * pages that actually exist.
+ */
+export function flattenSitemap(
+  pages: SitemapPage[] = sitemap,
+  trail: string[] = []
+): SitemapLeaf[] {
+  return pages.flatMap(page => {
+    const heading = page.label ?? page.name;
+    if (page.pages) {
+      return flattenSitemap(page.pages, heading ? [...trail, heading] : trail);
+    }
+    if (!page.name || !page.path || page.path === '#!') return [];
+    return [{ name: page.name, path: page.path, trail }];
+  });
+}

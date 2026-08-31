@@ -3,6 +3,7 @@
 import strawberry
 from strawberry_django.optimizer import DjangoOptimizerExtension
 
+from core.graphql.search import SearchQuery
 from domains.audit.graphql.queries import AuditQuery
 from domains.controls.graphql.queries import ControlsQuery
 from domains.iam.graphql.mutations import IamMutation
@@ -14,7 +15,15 @@ from domains.risk.graphql.queries import RiskQuery
 
 
 @strawberry.type
-class Query(IamQuery, RiskQuery, ControlsQuery, AuditQuery, IncidentsQuery, ObligationsQuery):
+class Query(
+    IamQuery,
+    RiskQuery,
+    ControlsQuery,
+    AuditQuery,
+    IncidentsQuery,
+    ObligationsQuery,
+    SearchQuery,
+):
     pass
 
 

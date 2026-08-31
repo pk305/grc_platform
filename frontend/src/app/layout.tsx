@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
 import { Nunito_Sans, Poppins } from 'next/font/google';
-import { Theme } from '@radix-ui/themes';
 import ThemeInit from '@/components/ThemeInit';
 import ApolloProviderWrapper from '@/lib/apollo/ApolloProviderWrapper';
 import { AuthProvider } from '@/features/auth/AuthContext';
+import {
+  ThemeProvider,
+  THEME_STORAGE_KEY
+} from '@/features/theme/ThemeContext';
 import { ToastProvider } from '@/components/common/Toast';
 import { siteConfig } from '@/lib/site-config';
 import '@fortawesome/fontawesome-free/css/all.min.css';
@@ -43,21 +46,42 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: '#ffffff'
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b1727' }
+  ]
 };
+
+/**
+ * Applies the stored theme before first paint, so a dark-mode user never gets
+ * a white flash while React hydrates. Deliberately dependency-free and inline:
+ * anything loaded over the network would be too late to matter.
+ */
+const NO_FLASH_SCRIPT = `
+(function () {
+  try {
+    var stored = localStorage.getItem('${THEME_STORAGE_KEY}');
+    var dark = stored === 'dark' || ((!stored || stored === 'system') &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  } catch (e) {}
+})();
+`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en-US" dir="ltr" className={poppins.variable}>
+    <html
+      lang="en-US"
+      dir="ltr"
+      className={poppins.variable}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }} />
+      </head>
       <body className={nunitoSans.className}>
-        <Theme
-          appearance="light"
-          accentColor="blue"
-          grayColor="slate"
-          radius="small"
-          hasBackground={false}
-          panelBackground="solid"
-        >
+        <ThemeProvider>
           <ApolloProviderWrapper>
             <AuthProvider>
               <ToastProvider>
@@ -65,7 +89,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </ToastProvider>
             </AuthProvider>
           </ApolloProviderWrapper>
-        </Theme>
+        </ThemeProvider>
         <ThemeInit />
       </body>
     </html>

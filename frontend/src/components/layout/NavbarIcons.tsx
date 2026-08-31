@@ -1,53 +1,26 @@
 'use client';
 
-// import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Avatar from '@/components/common/Avatar';
 import { Button } from '@/components/ui/Button';
 import { useAuth, type AuthUser } from '@/features/auth/AuthContext';
+import NotificationsDropdown, {
+  useAttentionItems
+} from './NotificationsDropdown';
+import SettingsDropdown from './SettingsDropdown';
 
-// function NineDotsDropdown() {
-//   return (
-//     <div
-//       className="dropdown-menu dropdown-menu-end py-0 dropdown-nide-dots shadow border border-300"
-//       aria-labelledby="navbarDropdownNindeDots"
-//     >
-//       <div className="card bg-white position-relative border-0">
-//         <div
-//           className="card-body pt-3 px-3 pb-0 overflow-auto scrollbar"
-//           style={{ height: '20rem' }}
-//         >
-//           <div className="row text-center align-items-center gx-0 gy-0">
-//             {brands.map(item => (
-//               <div className="col-4" key={item.title}>
-//                 <a
-//                   className="d-block hover-bg-200 p-2 rounded-3 text-center text-decoration-none mb-3"
-//                   href="#!"
-//                   target="_blank"
-//                   rel="noreferrer"
-//                 >
-//                   <Image
-//                     src={`/assets/img/${item.img}`}
-//                     alt=""
-//                     width={item.w}
-//                     height={item.h}
-//                     style={{ width: item.displayWidth ?? 30, height: 'auto' }}
-//                   />
-//                   <p
-//                     className={`mb-0 text-black text-truncate fs--2 mt-1 ${item.img ? 'pt-1' : ''}`.trim()}
-//                   >
-//                     {item.title}
-//                   </p>
-//                 </a>
-//               </div>
-//             ))}
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
+// feather.replace() swaps each placeholder span for an SVG outside of React,
+// leaving React holding a node that is no longer in the document. Nothing may
+// therefore be inserted or removed beside one after mount — which is why the
+// bell's badge stays mounted and only toggles `hidden`.
+const ICON_SIZE = { height: 20, width: 20 } as const;
+
+const PROFILE_LINKS: [icon: string, label: string, href: string][] = [
+  ['user', 'Profile', '/profile'],
+  ['shield', 'Security', '/profile#security'],
+  ['pie-chart', 'Dashboard', '/']
+];
 
 function ProfileDropdown({
   user,
@@ -63,11 +36,8 @@ function ProfileDropdown({
       className="dropdown-menu dropdown-menu-end py-0 dropdown-profile shadow border border-300"
       aria-labelledby="navbarDropdownUser"
     >
-      <div className="card bg-white position-relative border-0">
-        <div
-          className="card-body p-0 overflow-auto scrollbar"
-          style={{ height: '18rem' }}
-        >
+      <div className="card position-relative border-0">
+        <div className="card-body p-0">
           <div className="text-center pt-4 pb-3">
             <Avatar
               name={fullName}
@@ -76,30 +46,18 @@ function ProfileDropdown({
               status=""
               round="circle"
             />
-            <h6 className="mt-2">{fullName}</h6>
+            <h6 className="mt-2 mb-0">{fullName}</h6>
             <p className="text-600 fs--1 mb-0">{user.email}</p>
           </div>
-          {/* <div className="mb-3 mx-3">
-            <input
-              id="statusUpdateInput"
-              className="form-control form-control-sm"
-              type="text"
-              placeholder="Update your status"
-            />
-          </div> */}
           <ul className="nav d-flex flex-column mb-2 pb-1">
-            {[
-              ['user', 'Profile', '/profile'],
-              ['shield', 'Security', '/profile#security'],
-              ['pie-chart', 'Dashboard', '/'],
-              // ['lock', 'Posts & Activity'],
-              // ['settings', 'Settings & Privacy'],
-              ['help-circle', 'Help Center', '#!'],
-              ['globe', 'Language', '#!']
-            ].map(([icon, label, href]) => (
-              <li className="nav-item" key={icon}>
+            {PROFILE_LINKS.map(([icon, label, href]) => (
+              <li className="nav-item" key={href}>
                 <Link className="nav-link px-3" href={href}>
-                  <span className="me-2 text-900" data-feather={icon} />
+                  <span
+                    className="me-2 text-900"
+                    data-feather={icon}
+                    aria-hidden="true"
+                  />
                   {label}
                 </Link>
               </li>
@@ -107,15 +65,6 @@ function ProfileDropdown({
           </ul>
         </div>
         <div className="card-footer p-0 border-top">
-          {/* <ul className="nav d-flex flex-column my-3">
-            <li className="nav-item">
-              <a className="nav-link px-3" href="#!">
-                <span className="me-2 text-900" data-feather="user-plus" />
-                Add another account
-              </a>
-            </li>
-          </ul> */}
-          {/* <hr className="border-none" /> */}
           <div className="px-3 my-3">
             <Button
               variant="soft"
@@ -123,23 +72,14 @@ function ProfileDropdown({
               className="d-flex flex-center w-100"
               onClick={onSignOut}
             >
-              <span className="me-2" data-feather="log-out" />
+              <span
+                className="me-2"
+                data-feather="log-out"
+                aria-hidden="true"
+              />
               Sign out
             </Button>
           </div>
-          {/* <div className="my-2 text-center fw-bold fs--2 text-600">
-            <a className="text-600 me-1" href="#!">
-              Privacy policy
-            </a>
-            &bull;
-            <a className="text-600 mx-1" href="#!">
-              Terms
-            </a>
-            &bull;
-            <a className="text-600 ms-1" href="#!">
-              Cookies
-            </a>
-          </div> */}
         </div>
       </div>
     </div>
@@ -148,6 +88,8 @@ function ProfileDropdown({
 
 export default function NavbarIcons() {
   const { user, logout } = useAuth();
+  const { items: attentionItems, loading: attentionLoading } =
+    useAttentionItems();
   const router = useRouter();
 
   async function handleSignOut() {
@@ -160,92 +102,83 @@ export default function NavbarIcons() {
     }
   }
 
+  const attentionCount = attentionItems.length;
+
   return (
-    <ul className="navbar-nav navbar-nav-icons ms-auto flex-row">
+    <ul className="navbar-nav navbar-nav-icons ms-auto flex-row align-items-center gap-1">
       <li className="nav-item dropdown">
-        <a
+        <button
           id="navbarDropdownNotification"
-          className="nav-link"
-          href="#!"
-          role="button"
+          className="nav-link btn btn-link position-relative border-0 shadow-none"
+          type="button"
           data-bs-toggle="dropdown"
           aria-haspopup="true"
           aria-expanded="false"
+          aria-label={
+            attentionCount > 0
+              ? `Notifications — ${attentionCount} need attention`
+              : 'Notifications'
+          }
         >
           <span
             className="text-700"
             data-feather="bell"
-            style={{ height: 20, width: 20 }}
+            style={ICON_SIZE}
+            aria-hidden="true"
           />
-        </a>
+          {/* Always mounted so React only ever updates it in place. */}
+          <span
+            className="position-absolute badge rounded-pill bg-danger text-white"
+            style={{
+              top: 2,
+              insetInlineEnd: 0,
+              fontSize: '0.6rem',
+              padding: '0.15rem 0.3rem'
+            }}
+            hidden={attentionCount === 0}
+            aria-hidden="true"
+          >
+            {attentionCount}
+          </span>
+        </button>
+        <NotificationsDropdown
+          items={attentionItems}
+          loading={attentionLoading}
+        />
       </li>
+
       <li className="nav-item dropdown">
-        <a
+        <button
           id="navbarDropdownSettings"
-          className="nav-link notification-indicator notification-indicator-primary"
-          href="#!"
-          role="button"
+          className="nav-link btn btn-link border-0 shadow-none"
+          type="button"
           data-bs-toggle="dropdown"
           aria-haspopup="true"
           aria-expanded="false"
+          aria-label="Settings"
         >
           <span
             className="text-700"
             data-feather="settings"
-            style={{ height: 20, width: 20 }}
+            style={ICON_SIZE}
+            aria-hidden="true"
           />
-        </a>
+        </button>
+        <SettingsDropdown />
       </li>
-      {/* <li className="nav-item dropdown">
-        <a
-          id="navbarDropdownNindeDots"
-          className="nav-link"
-          href="#!"
-          role="button"
-          data-bs-toggle="dropdown"
-          aria-haspopup="true"
-          aria-expanded="false"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            {[
-              [2, 2],
-              [2, 8],
-              [2, 14],
-              [8, 8],
-              [8, 14],
-              [14, 8],
-              [14, 14],
-              [8, 2],
-              [14, 2]
-            ].map(([cx, cy]) => (
-              <circle
-                key={`${cx}-${cy}`}
-                cx={cx}
-                cy={cy}
-                r="2"
-                fill="#6C6E71"
-              />
-            ))}
-          </svg>
-        </a>
-        <NineDotsDropdown />
-      </li> */}
+
       {user && (
-        <li className="nav-item dropdown">
-          <a
+        <li className="nav-item dropdown ms-2">
+          <button
             id="navbarDropdownUser"
-            className="nav-link lh-1 px-0 ms-5"
-            href="#!"
-            role="button"
+            className="nav-link btn btn-link lh-1 px-0 border-0 shadow-none"
+            type="button"
             data-bs-toggle="dropdown"
             aria-haspopup="true"
             aria-expanded="false"
+            aria-label={`Account menu for ${
+              `${user.firstName} ${user.lastName}`.trim() || user.email
+            }`}
           >
             <Avatar
               name={`${user.firstName} ${user.lastName}`.trim() || user.email}
@@ -254,7 +187,7 @@ export default function NavbarIcons() {
               status=""
               round="circle"
             />
-          </a>
+          </button>
           <ProfileDropdown user={user} onSignOut={handleSignOut} />
         </li>
       )}

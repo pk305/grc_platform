@@ -1,0 +1,33 @@
+# Data behind the top navbar's controls: quick search, and the counts that
+# drive the notifications bell.
+
+query GlobalSearch($query: String!, $limit: Int) {
+  globalSearch(query: $query, limit: $limit) {
+    id
+    kind
+    label
+    sublabel
+    url
+  }
+}
+
+# Attention counts every signed-in user may see.
+query NavbarAttention {
+  riskSummary {
+    overdueForReviewCount
+  }
+  auditSummary {
+    overdueCorrectiveActionsCount
+  }
+  obligationSummary {
+    reviewsDueSoonCount
+  }
+}
+
+# Split from NavbarAttention so the whole bell doesn't fail for users who
+# aren't entitled to tenant-wide sign-in data.
+query NavbarAdminAttention {
+  accessSummary {
+    signInFailures24h
+  }
+}
