@@ -22,13 +22,26 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from strawberry.types import Info
 
 from domains.iam.crypto import decrypt, encrypt
-from domains.iam.models import IamAuditEvent, LoginAttempt, MfaRecoveryCode, Role, User
+from domains.iam.images import STORED_CONTENT_TYPE, decode_avatar
+from domains.iam.models import (
+    IamAuditEvent,
+    LoginAttempt,
+    MfaRecoveryCode,
+    Permission,
+    Role,
+    User,
+    UserAvatar,
+)
 from domains.iam.permissions import require_roles
 
 from .types import (
     AssignRoleInput,
     MfaConfirmedType,
+    MfaRecoveryCodesType,
     MfaSetupType,
+    MyProfileInput,
+    PermissionType,
+    RolePermissionInput,
     UserCreateInput,
     UserType,
     UserUpdateInput,
@@ -109,6 +122,10 @@ class RoleError:
 
 
 AssignRoleResult = Annotated[UserType | RoleError, strawberry.union("AssignRoleResult")]
+
+RolePermissionResult = Annotated[
+    PermissionType | RoleError, strawberry.union("RolePermissionResult")
+]
 
 
 def _actor(info: Info) -> User | None:
@@ -302,6 +319,104 @@ class IamMutation:
             )
         return user  # type: ignore[return-value]
 
+    @strawberry_django.mutation(handle_django_errors=True)
+    def regenerate_mfa_recovery_codes(self, info: Info, password: str) -> MfaRecoveryCodesType:
+        """Issues a fresh set of recovery codes, invalidating the previous set (A.8.5).
+
+        Re-authentication is required because holding these codes is equivalent
+        to holding the second factor.
+        """
+        user = info.context.request.user
+        if not user.is_authenticated:
+            raise DjangoValidationError("You must be signed in to manage recovery codes.")
+        if not user.mfa_enabled:
+            raise DjangoValidationError("Enable MFA before generating recovery codes.")
+        if not user.check_password(password):
+            raise DjangoValidationError("Current password is incorrect.")
+
+        with transaction.atomic():
+            codes = _generate_recovery_codes(user)
+            IamAuditEvent.objects.create(
+                event_type=IamAuditEvent.EventType.MFA_CODES_REGENERATED,
+                actor=user,
+                target_user=user,
+                detail=user.email,
+            )
+        return MfaRecoveryCodesType(recovery_codes=codes)
+
+    @strawberry_django.mutation(handle_django_errors=True)
+    def update_my_profile(self, info: Info, data: MyProfileInput) -> UserType:
+        """Self-service edit of the caller's own contact attributes.
+
+        Email, username and role membership are deliberately not editable here —
+        those decide access and stay administrator-owned (A.5.16, A.5.18). Every
+        change is written to the immutable trail like an administrative one.
+        """
+        user = info.context.request.user
+        if not user.is_authenticated:
+            raise DjangoValidationError("You must be signed in to update your profile.")
+        if user.auth_provider == User.AuthProvider.ENTRA_ID:
+            raise DjangoValidationError(
+                "Your profile is managed by Microsoft Entra ID and cannot be edited here."
+            )
+
+        user.first_name = data.first_name.strip()
+        user.last_name = data.last_name.strip()
+        user.department = data.department.strip()
+        user.full_clean(exclude=["password"])
+        user.save(update_fields=["first_name", "last_name", "department"])
+        IamAuditEvent.objects.create(
+            event_type=IamAuditEvent.EventType.PROFILE_UPDATED,
+            actor=user,
+            target_user=user,
+            detail=user.email,
+        )
+        return user  # type: ignore[return-value]
+
+    @strawberry_django.mutation(handle_django_errors=True)
+    def update_my_avatar(self, info: Info, image_base64: str) -> UserType:
+        """Sets the caller's profile photo from a base64-encoded image.
+
+        The bytes are decoded, checked and re-encoded server-side (see
+        `domains.iam.images`) so what gets stored is always a plain square JPEG
+        with no embedded metadata, whatever the client sent.
+        """
+        user = info.context.request.user
+        if not user.is_authenticated:
+            raise DjangoValidationError("You must be signed in to change your photo.")
+
+        image = decode_avatar(image_base64)
+        with transaction.atomic():
+            UserAvatar.objects.update_or_create(
+                user=user,
+                defaults={"image": image, "content_type": STORED_CONTENT_TYPE},
+            )
+            IamAuditEvent.objects.create(
+                event_type=IamAuditEvent.EventType.PROFILE_UPDATED,
+                actor=user,
+                target_user=user,
+                detail=f"{user.email} · profile photo updated",
+            )
+        return user  # type: ignore[return-value]
+
+    @strawberry_django.mutation(handle_django_errors=True)
+    def remove_my_avatar(self, info: Info) -> UserType:
+        """Deletes the caller's profile photo, falling back to their initials."""
+        user = info.context.request.user
+        if not user.is_authenticated:
+            raise DjangoValidationError("You must be signed in to change your photo.")
+
+        with transaction.atomic():
+            deleted, _ = UserAvatar.objects.filter(user=user).delete()
+            if deleted:
+                IamAuditEvent.objects.create(
+                    event_type=IamAuditEvent.EventType.PROFILE_UPDATED,
+                    actor=user,
+                    target_user=user,
+                    detail=f"{user.email} · profile photo removed",
+                )
+        return user  # type: ignore[return-value]
+
     @strawberry_django.mutation(
         handle_django_errors=True, extensions=[require_roles(Role.Name.ADMIN)]
     )
@@ -486,3 +601,33 @@ class IamMutation:
             detail=f"{role.name} → {user.email}",
         )
         return user  # type: ignore[return-value]
+
+    @strawberry_django.mutation(extensions=[require_roles(Role.Name.ADMIN)])
+    def assign_permission(self, info: Info, data: RolePermissionInput) -> RolePermissionResult:
+        try:
+            permission = Permission.objects.get(pk=data.permission_id)
+            role = Role.objects.get(name=data.role_name)
+        except (Permission.DoesNotExist, Role.DoesNotExist):
+            return RoleError(message="Role or permission not found.")
+        permission.roles.add(role)
+        IamAuditEvent.objects.create(
+            event_type=IamAuditEvent.EventType.PERMISSION_GRANTED,
+            actor=_actor(info),
+            detail=f"{permission.resource}:{permission.action} → {role.name}",
+        )
+        return permission  # type: ignore[return-value]
+
+    @strawberry_django.mutation(extensions=[require_roles(Role.Name.ADMIN)])
+    def revoke_permission(self, info: Info, data: RolePermissionInput) -> RolePermissionResult:
+        try:
+            permission = Permission.objects.get(pk=data.permission_id)
+            role = Role.objects.get(name=data.role_name)
+        except (Permission.DoesNotExist, Role.DoesNotExist):
+            return RoleError(message="Role or permission not found.")
+        permission.roles.remove(role)
+        IamAuditEvent.objects.create(
+            event_type=IamAuditEvent.EventType.PERMISSION_REVOKED,
+            actor=_actor(info),
+            detail=f"{permission.resource}:{permission.action} → {role.name}",
+        )
+        return permission  # type: ignore[return-value]

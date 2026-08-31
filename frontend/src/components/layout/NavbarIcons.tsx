@@ -1,6 +1,7 @@
 'use client';
 
 // import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Avatar from '@/components/common/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -68,7 +69,13 @@ function ProfileDropdown({
           style={{ height: '18rem' }}
         >
           <div className="text-center pt-4 pb-3">
-            <Avatar name={fullName} size="xl" status="" round="circle" />
+            <Avatar
+              name={fullName}
+              src={user.avatarUrl}
+              size="xl"
+              status=""
+              round="circle"
+            />
             <h6 className="mt-2">{fullName}</h6>
             <p className="text-600 fs--1 mb-0">{user.email}</p>
           </div>
@@ -82,18 +89,19 @@ function ProfileDropdown({
           </div> */}
           <ul className="nav d-flex flex-column mb-2 pb-1">
             {[
-              ['user', 'Profile'],
-              ['pie-chart', 'Dashboard'],
+              ['user', 'Profile', '/profile'],
+              ['shield', 'Security', '/profile#security'],
+              ['pie-chart', 'Dashboard', '/'],
               // ['lock', 'Posts & Activity'],
               // ['settings', 'Settings & Privacy'],
-              ['help-circle', 'Help Center'],
-              ['globe', 'Language']
-            ].map(([icon, label]) => (
+              ['help-circle', 'Help Center', '#!'],
+              ['globe', 'Language', '#!']
+            ].map(([icon, label, href]) => (
               <li className="nav-item" key={icon}>
-                <a className="nav-link px-3" href="#!">
+                <Link className="nav-link px-3" href={href}>
                   <span className="me-2 text-900" data-feather={icon} />
                   {label}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
@@ -241,6 +249,7 @@ export default function NavbarIcons() {
           >
             <Avatar
               name={`${user.firstName} ${user.lastName}`.trim() || user.email}
+              src={user.avatarUrl}
               size="l"
               status=""
               round="circle"

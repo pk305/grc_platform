@@ -10,18 +10,17 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Button, IconButton, Text, TextField } from '@/components/ui';
+import { Button, IconButton, TextField } from '@/components/ui';
+import {
+  PasswordRequirement,
+  PasswordStrengthMeter
+} from '@/components/common/PasswordStrength';
 import AcentriaLogo from '@/components/common/AcentriaLogo';
 import AuthShowcasePanel from '@/components/auth/AuthShowcasePanel';
 import { PageTitle } from '@/components/common/PageTitle';
 import { useChangePasswordMutation } from './__generated__/queries.generated';
 import { useAuth } from './AuthContext';
-import {
-  MIN_PASSWORD_LENGTH,
-  STRENGTH_LABELS,
-  isCommonPassword,
-  scoreStrength
-} from '@/lib/password';
+import { MIN_PASSWORD_LENGTH, isCommonPassword } from '@/lib/password';
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev';
 
@@ -35,49 +34,6 @@ const MESSAGES = {
   notReady: 'Your new password does not meet the requirements below.',
   unavailable: 'Something went wrong. Please try again.'
 } as const;
-
-function StrengthMeter({ value }: { value: string }) {
-  const score = scoreStrength(value);
-  const colors = ['bg-300', 'bg-danger', 'bg-warning', 'bg-info', 'bg-success'];
-
-  return (
-    <div className="mb-3">
-      <div className="d-flex gap-1 mb-1">
-        {Array.from({ length: 4 }, (_, i) => (
-          <div
-            key={i}
-            className={`rounded-pill ${i < score ? colors[score] : 'bg-300'}`}
-            style={{ height: 4, flex: 1 }}
-          />
-        ))}
-      </div>
-      <Text size="1" color="gray">
-        Strength: {STRENGTH_LABELS[score]}
-      </Text>
-    </div>
-  );
-}
-
-function Requirement({
-  met,
-  children
-}: {
-  met: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <li
-      className={`d-flex align-items-start gap-2 ${met ? 'text-success' : 'text-700'}`}
-    >
-      <span
-        className={met ? 'far fa-check-circle mt-1' : 'far fa-circle mt-1'}
-        aria-hidden="true"
-        style={{ fontSize: '0.75rem' }}
-      />
-      <span className="fs--1">{children}</span>
-    </li>
-  );
-}
 
 function HalftoneDots({ className }: { className: string }) {
   return (
@@ -290,19 +246,19 @@ export default function ForcePasswordChangeDialog() {
             </div>
 
             <ul className="list-unstyled mb-2 d-flex flex-column gap-1">
-              <Requirement met={lengthOk}>
+              <PasswordRequirement met={lengthOk}>
                 At least {MIN_PASSWORD_LENGTH} characters — a passphrase works
                 well
-              </Requirement>
-              <Requirement met={differentFromTemp}>
+              </PasswordRequirement>
+              <PasswordRequirement met={differentFromTemp}>
                 Different from your temporary password
-              </Requirement>
-              <Requirement met={notCommon}>
+              </PasswordRequirement>
+              <PasswordRequirement met={notCommon}>
                 Not a commonly used password
-              </Requirement>
+              </PasswordRequirement>
             </ul>
 
-            <StrengthMeter value={newPassword} />
+            <PasswordStrengthMeter value={newPassword} />
 
             <div className="mb-4">
               <TextField

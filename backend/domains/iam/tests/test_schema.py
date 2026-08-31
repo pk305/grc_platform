@@ -1,16 +1,30 @@
+import base64
 import datetime
+import io
 
 import pyotp
 import pytest
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.test import Client
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from PIL import Image
 from strawberry.django.test import GraphQLTestClient
 
-from domains.iam.models import IamAuditEvent, LoginAttempt, Permission, Role, User
+from domains.iam.crypto import encrypt
+from domains.iam.images import AVATAR_EDGE_PX, MAX_ENCODED_LENGTH
+from domains.iam.models import (
+    IamAuditEvent,
+    LoginAttempt,
+    MfaRecoveryCode,
+    Permission,
+    Role,
+    User,
+    UserAvatar,
+)
 
 from .factories import LoginAttemptFactory, RoleFactory, UserFactory
 
@@ -1069,3 +1083,336 @@ def test_admin_can_set_mfa_required(gql_client: GraphQLTestClient, client: Clien
     assert result.data["setMfaRequired"]["mfaRequired"] is True
     target.refresh_from_db()
     assert target.mfa_required is True
+
+
+UPDATE_MY_PROFILE = """
+  mutation($data: MyProfileInput!) {
+    updateMyProfile(data: $data) {
+      ... on UserType { id firstName lastName department email }
+      ... on OperationInfo { messages { kind field message } }
+    }
+  }
+"""
+
+MY_AUDIT_EVENTS = """
+  query($limit: Int!) {
+    myAuditEvents(limit: $limit) { id eventType actor detail }
+  }
+"""
+
+REGENERATE_RECOVERY_CODES = """
+  mutation($password: String!) {
+    regenerateMfaRecoveryCodes(password: $password) {
+      ... on MfaRecoveryCodesType { recoveryCodes }
+      ... on OperationInfo { messages { message } }
+    }
+  }
+"""
+
+
+def test_update_my_profile_requires_authentication(gql_client: GraphQLTestClient) -> None:
+    result = gql_client.query(UPDATE_MY_PROFILE, variables={"data": {"firstName": "Grace"}})
+
+    assert result.data["updateMyProfile"]["messages"]
+
+
+def test_update_my_profile_updates_own_details_and_audits(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory()
+    client.force_login(user)
+
+    result = gql_client.query(
+        UPDATE_MY_PROFILE,
+        variables={
+            "data": {"firstName": " Grace ", "lastName": "Hopper", "department": "Security"}
+        },
+    )
+
+    assert result.errors is None
+    assert result.data["updateMyProfile"]["firstName"] == "Grace"
+    user.refresh_from_db()
+    assert (user.first_name, user.last_name, user.department) == ("Grace", "Hopper", "Security")
+    event = IamAuditEvent.objects.get(event_type=IamAuditEvent.EventType.PROFILE_UPDATED)
+    assert event.actor == user
+    assert event.target_user == user
+
+
+def test_update_my_profile_cannot_change_access_attributes(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    """Email, username and roles decide access — they stay administrator-owned (A.5.16)."""
+    role = RoleFactory(name=Role.Name.VIEWER)
+    user = UserFactory(roles=[role], email="original@example.com", username="original")
+    client.force_login(user)
+
+    gql_client.query(UPDATE_MY_PROFILE, variables={"data": {"firstName": "Grace"}})
+
+    user.refresh_from_db()
+    assert user.email == "original@example.com"
+    assert user.username == "original"
+    assert [r.name for r in user.roles.all()] == [Role.Name.VIEWER]
+
+
+def test_update_my_profile_rejected_for_sso_accounts(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory(auth_provider=User.AuthProvider.ENTRA_ID, first_name="Ada")
+    client.force_login(user)
+
+    result = gql_client.query(UPDATE_MY_PROFILE, variables={"data": {"firstName": "Grace"}})
+
+    assert result.data["updateMyProfile"]["messages"]
+    user.refresh_from_db()
+    assert user.first_name == "Ada"
+
+
+def test_my_audit_events_is_scoped_to_the_caller(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory()
+    other = UserFactory()
+    IamAuditEvent.objects.create(
+        event_type=IamAuditEvent.EventType.USER_UPDATED,
+        actor=other,
+        target_user=user,
+        detail="mine",
+    )
+    IamAuditEvent.objects.create(
+        event_type=IamAuditEvent.EventType.USER_UPDATED,
+        actor=other,
+        target_user=other,
+        detail="not mine",
+    )
+    LoginAttemptFactory(email=user.email, user=user, success=True)
+    LoginAttemptFactory(email=other.email, user=other, success=False)
+    client.force_login(user)
+
+    result = gql_client.query(MY_AUDIT_EVENTS, variables={"limit": 25})
+
+    assert result.errors is None
+    details = {event["detail"] for event in result.data["myAuditEvents"]}
+    assert "mine" in details
+    assert "not mine" not in details
+    assert {event["actor"] for event in result.data["myAuditEvents"]} <= {other.email, user.email}
+
+
+def test_my_audit_events_is_empty_when_anonymous(gql_client: GraphQLTestClient) -> None:
+    IamAuditEvent.objects.create(
+        event_type=IamAuditEvent.EventType.USER_CREATED, detail="somebody else"
+    )
+
+    result = gql_client.query(MY_AUDIT_EVENTS, variables={"limit": 25})
+
+    assert result.errors is None
+    assert result.data["myAuditEvents"] == []
+
+
+def test_regenerate_recovery_codes_replaces_the_previous_set(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory(mfa_enabled=True, mfa_secret=encrypt(pyotp.random_base32()))
+    user.set_password("Str0ng-pass!")
+    user.save()
+    MfaRecoveryCode.objects.create(user=user, code_hash=make_password("old-code"))
+    client.force_login(user)
+
+    result = gql_client.query(REGENERATE_RECOVERY_CODES, variables={"password": "Str0ng-pass!"})
+
+    assert result.errors is None
+    codes = result.data["regenerateMfaRecoveryCodes"]["recoveryCodes"]
+    assert len(codes) == 10
+    assert user.mfa_recovery_codes.count() == 10
+    assert not any(check_password("old-code", c.code_hash) for c in user.mfa_recovery_codes.all())
+    assert IamAuditEvent.objects.filter(
+        event_type=IamAuditEvent.EventType.MFA_CODES_REGENERATED, actor=user
+    ).exists()
+
+
+def test_regenerate_recovery_codes_rejects_wrong_password(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory(mfa_enabled=True, mfa_secret=encrypt(pyotp.random_base32()))
+    user.set_password("Str0ng-pass!")
+    user.save()
+    client.force_login(user)
+
+    result = gql_client.query(REGENERATE_RECOVERY_CODES, variables={"password": "wrong"})
+
+    assert result.data["regenerateMfaRecoveryCodes"]["messages"]
+    assert user.mfa_recovery_codes.count() == 0
+
+
+def test_mfa_recovery_codes_remaining_counts_unused_codes(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory(mfa_enabled=True)
+    MfaRecoveryCode.objects.create(user=user, code_hash=make_password("unused"))
+    MfaRecoveryCode.objects.create(
+        user=user, code_hash=make_password("used"), used_at=timezone.now()
+    )
+    client.force_login(user)
+
+    result = gql_client.query("query { me { mfaRecoveryCodesRemaining } }")
+
+    assert result.errors is None
+    assert result.data["me"]["mfaRecoveryCodesRemaining"] == 1
+
+
+UPDATE_MY_AVATAR = """
+  mutation($imageBase64: String!) {
+    updateMyAvatar(imageBase64: $imageBase64) {
+      ... on UserType { id avatarUrl }
+      ... on OperationInfo { messages { message } }
+    }
+  }
+"""
+
+REMOVE_MY_AVATAR = """
+  mutation {
+    removeMyAvatar {
+      ... on UserType { id avatarUrl }
+      ... on OperationInfo { messages { message } }
+    }
+  }
+"""
+
+
+def _png_bytes(size: tuple[int, int] = (400, 200), color: str = "red") -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", size, color).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_update_my_avatar_stores_a_normalised_square_jpeg(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory()
+    client.force_login(user)
+
+    result = gql_client.query(
+        UPDATE_MY_AVATAR,
+        variables={"imageBase64": base64.b64encode(_png_bytes()).decode()},
+    )
+
+    assert result.errors is None
+    assert result.data["updateMyAvatar"]["avatarUrl"].startswith(
+        "data:image/jpeg;base64,"
+    )
+    avatar = UserAvatar.objects.get(user=user)
+    with Image.open(io.BytesIO(bytes(avatar.image))) as stored:
+        assert stored.format == "JPEG"
+        assert stored.size == (AVATAR_EDGE_PX, AVATAR_EDGE_PX)
+    assert IamAuditEvent.objects.filter(
+        event_type=IamAuditEvent.EventType.PROFILE_UPDATED, actor=user
+    ).exists()
+
+
+def test_update_my_avatar_accepts_a_browser_data_url(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory()
+    client.force_login(user)
+    encoded = base64.b64encode(_png_bytes()).decode()
+
+    result = gql_client.query(
+        UPDATE_MY_AVATAR, variables={"imageBase64": f"data:image/png;base64,{encoded}"}
+    )
+
+    assert result.errors is None
+    assert UserAvatar.objects.filter(user=user).exists()
+
+
+def test_update_my_avatar_replaces_the_previous_photo(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory()
+    client.force_login(user)
+
+    gql_client.query(
+        UPDATE_MY_AVATAR,
+        variables={"imageBase64": base64.b64encode(_png_bytes(color="red")).decode()},
+    )
+    gql_client.query(
+        UPDATE_MY_AVATAR,
+        variables={"imageBase64": base64.b64encode(_png_bytes(color="blue")).decode()},
+    )
+
+    assert UserAvatar.objects.filter(user=user).count() == 1
+
+
+def test_update_my_avatar_rejects_a_file_that_is_not_an_image(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory()
+    client.force_login(user)
+
+    result = gql_client.query(
+        UPDATE_MY_AVATAR,
+        variables={"imageBase64": base64.b64encode(b"#!/bin/sh\nrm -rf /").decode()},
+    )
+
+    assert result.data["updateMyAvatar"]["messages"]
+    assert not UserAvatar.objects.filter(user=user).exists()
+
+
+def test_update_my_avatar_rejects_an_oversized_payload(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory()
+    client.force_login(user)
+
+    result = gql_client.query(
+        UPDATE_MY_AVATAR, variables={"imageBase64": "A" * (MAX_ENCODED_LENGTH + 4)}
+    )
+
+    assert result.data["updateMyAvatar"]["messages"]
+    assert not UserAvatar.objects.filter(user=user).exists()
+
+
+def test_update_my_avatar_requires_authentication(gql_client: GraphQLTestClient) -> None:
+    result = gql_client.query(
+        UPDATE_MY_AVATAR,
+        variables={"imageBase64": base64.b64encode(_png_bytes()).decode()},
+    )
+
+    assert result.data["updateMyAvatar"]["messages"]
+    assert not UserAvatar.objects.exists()
+
+
+def test_stored_avatar_carries_no_exif_metadata(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    """Camera photos carry GPS coordinates; re-encoding must drop them (A.8.11)."""
+    user = UserFactory()
+    client.force_login(user)
+    source = io.BytesIO()
+    exif = Image.Exif()
+    exif[0x010E] = "taken at home"
+    Image.new("RGB", (300, 300), "green").save(source, format="JPEG", exif=exif)
+
+    gql_client.query(
+        UPDATE_MY_AVATAR,
+        variables={"imageBase64": base64.b64encode(source.getvalue()).decode()},
+    )
+
+    avatar = UserAvatar.objects.get(user=user)
+    with Image.open(io.BytesIO(bytes(avatar.image))) as stored:
+        assert not dict(stored.getexif())
+
+
+def test_remove_my_avatar_clears_the_photo(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    user = UserFactory()
+    client.force_login(user)
+    gql_client.query(
+        UPDATE_MY_AVATAR,
+        variables={"imageBase64": base64.b64encode(_png_bytes()).decode()},
+    )
+
+    result = gql_client.query(REMOVE_MY_AVATAR)
+
+    assert result.errors is None
+    assert result.data["removeMyAvatar"]["avatarUrl"] is None
+    assert not UserAvatar.objects.filter(user=user).exists()

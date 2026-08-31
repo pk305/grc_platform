@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 
 const togglePaginationButtonDisable = (button, disabled) => {
-  // eslint-disable-next-line no-param-reassign
   button.disabled = disabled;
   button.classList[disabled ? 'add' : 'remove']('disabled');
 };
@@ -105,7 +104,6 @@ export default function useDataList(containerRef, options) {
       viewAll?.addEventListener('click', onViewAll);
       viewLess?.addEventListener('click', onViewLess);
 
-      // eslint-disable-next-line consistent-return
       return () => {
         paginationButtonNext?.removeEventListener('click', onNext);
         paginationButtonPrev?.removeEventListener('click', onPrev);

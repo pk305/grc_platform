@@ -4,6 +4,7 @@ query Me {
     email
     firstName
     lastName
+    avatarUrl
     isSuperuser
     mustChangePassword
     mfaEnabled

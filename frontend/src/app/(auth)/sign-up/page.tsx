@@ -1,6 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import AuthShell from '@/components/auth/AuthShell';
 import SocialButtons from '@/components/auth/SocialButtons';
+
+export const metadata: Metadata = {
+  title: 'Sign Up'
+};
 
 export default function SignUpPage() {
   return (

@@ -18,11 +18,18 @@ export const sitemap: SitemapPage[] = [
   {
     label: 'administration',
     pages: [
-      { name: 'Overview', icon: 'grid', path: '/iam' },
-      { name: 'Users', icon: 'users', path: '/iam/users' },
-      { name: 'Roles', icon: 'shield', path: '/iam/roles' },
-      { name: 'Permissions', icon: 'key', path: '/iam/permissions' },
-      { name: 'Audit Log', icon: 'file-text', path: '/iam/audit-log' }
+      { name: 'My Profile', icon: 'user', path: '/profile' },
+      {
+        name: 'IAM',
+        icon: 'shield',
+        pages: [
+          { name: 'Overview', path: '/iam' },
+          { name: 'Users', path: '/iam/users' },
+          { name: 'Roles', path: '/iam/roles' },
+          { name: 'Permissions', path: '/iam/permissions' },
+          { name: 'Audit Log', path: '/iam/audit-log' }
+        ]
+      }
     ]
   }
 ];

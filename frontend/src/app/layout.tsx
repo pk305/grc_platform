@@ -27,7 +27,10 @@ const poppins = Poppins({
 });
 
 export const metadata = {
-  title: siteConfig.name,
+  title: {
+    default: siteConfig.name,
+    template: `%s | ${siteConfig.name}`
+  },
   icons: {
     icon: [
       { url: '/assets/img/favicons/favicon-32x32.png', sizes: '32x32' },

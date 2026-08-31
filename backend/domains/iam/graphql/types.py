@@ -4,7 +4,8 @@ import strawberry
 import strawberry_django
 from strawberry import auto
 
-from domains.iam.models import Permission, Role, User
+from domains.iam.images import to_data_url
+from domains.iam.models import Permission, Role, User, UserAvatar
 
 
 @strawberry_django.type(Role, fields=["id", "name"])
@@ -45,6 +46,22 @@ class RoleFilter:
 )
 class UserType:
     roles: list[RoleType]
+
+    @strawberry_django.field(only=["id"])
+    def mfa_recovery_codes_remaining(root: User) -> int:  # noqa: N805
+        """Unused one-time recovery codes left on the account (A.8.5)."""
+        return root.mfa_recovery_codes.filter(used_at__isnull=True).count()
+
+    @strawberry_django.field(only=["id"])
+    def avatar_url(root: User) -> str | None:  # noqa: N805
+        """The profile photo, or null when the account has none.
+
+        Currently a `data:` URL carrying the stored bytes; consumers should
+        treat it as an opaque image source so it can become a real URL if
+        avatars ever move to object storage.
+        """
+        avatar = UserAvatar.objects.filter(user=root).first()
+        return to_data_url(avatar.image, avatar.content_type) if avatar else None
 
 
 @strawberry.type
@@ -93,9 +110,29 @@ class UserUpdateInput:
 
 
 @strawberry.input
+class MyProfileInput:
+    """Self-service profile edit.
+
+    Deliberately narrower than `UserUpdateInput`: attributes that govern access
+    — email, username, roles, MFA requirement — stay administrator-owned so the
+    account holder cannot re-identify themselves (ISO/IEC 27001:2022 A.5.16).
+    """
+
+    first_name: str = ""
+    last_name: str = ""
+    department: str = ""
+
+
+@strawberry.input
 class AssignRoleInput:
     user_id: strawberry.ID
     role_name: str
+
+
+@strawberry.input
+class RolePermissionInput:
+    role_name: str
+    permission_id: strawberry.ID
 
 
 @strawberry_django.type(Permission, fields=["id", "resource", "action", "iso_clause"])
@@ -124,6 +161,13 @@ class MfaSetupType:
 
     secret: str
     provisioning_uri: str
+
+
+@strawberry.type
+class MfaRecoveryCodesType:
+    """A freshly issued set of recovery codes — shown once, never retrievable again."""
+
+    recovery_codes: list[str]
 
 
 @strawberry.type

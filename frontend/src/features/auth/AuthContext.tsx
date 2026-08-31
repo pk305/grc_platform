@@ -13,6 +13,7 @@ export interface AuthUser {
   email: string;
   firstName: string;
   lastName: string;
+  avatarUrl?: string | null;
   isSuperuser: boolean;
   mustChangePassword: boolean;
   mfaEnabled: boolean;

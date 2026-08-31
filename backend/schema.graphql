@@ -12,6 +12,8 @@ type AccessSummary {
 
 union AdminResetMfaPayload = UserType | OperationInfo
 
+union AssignPermissionPayload = PermissionType | RoleError | OperationInfo
+
 input AssignRoleInput {
   userId: ID!
   roleName: String!
@@ -190,6 +192,10 @@ type MfaConfirmedType {
   recoveryCodes: [String!]!
 }
 
+type MfaRecoveryCodesType {
+  recoveryCodes: [String!]!
+}
+
 type MfaRequired {
   message: String!
 }
@@ -209,6 +215,10 @@ type Mutation {
   beginMfaSetup: BeginMfaSetupPayload!
   confirmMfaSetup(code: String!): ConfirmMfaSetupPayload!
   disableMfa(password: String!): DisableMfaPayload!
+  regenerateMfaRecoveryCodes(password: String!): RegenerateMfaRecoveryCodesPayload!
+  updateMyProfile(data: MyProfileInput!): UpdateMyProfilePayload!
+  updateMyAvatar(imageBase64: String!): UpdateMyAvatarPayload!
+  removeMyAvatar: RemoveMyAvatarPayload!
   adminResetMfa(userId: ID!): AdminResetMfaPayload! @requireRoles
   setMfaRequired(userId: ID!, required: Boolean!): SetMfaRequiredPayload! @requireRoles
   createUser(data: UserCreateInput!): CreateUserPayload! @requireRoles
@@ -218,7 +228,15 @@ type Mutation {
   assignRole(data: AssignRoleInput!): AssignRolePayload! @requireRoles
   startAccessReview(userIds: [ID!]!): [UserType!]! @requireRoles
   revokeRole(data: AssignRoleInput!): RevokeRolePayload! @requireRoles
+  assignPermission(data: RolePermissionInput!): AssignPermissionPayload! @requireRoles
+  revokePermission(data: RolePermissionInput!): RevokePermissionPayload! @requireRoles
   createRisk(data: RiskCreateInput!): CreateRiskPayload! @requireRoles
+}
+
+input MyProfileInput {
+  firstName: String! = ""
+  lastName: String! = ""
+  department: String! = ""
 }
 
 type ObligationSummary {
@@ -292,6 +310,7 @@ type Query {
   me: UserType
   usernameAvailable(username: String!): Boolean! @requireRoles
   auditEvents(limit: Int! = 50): [AuditEventType!]!
+  myAuditEvents(limit: Int! = 25): [AuditEventType!]!
   accessSummary: AccessSummary!
   risks(order: RiskOrder): [RiskType!]!
   riskSummary: RiskSummary!
@@ -301,7 +320,13 @@ type Query {
   obligationSummary: ObligationSummary!
 }
 
+union RegenerateMfaRecoveryCodesPayload = MfaRecoveryCodesType | OperationInfo
+
+union RemoveMyAvatarPayload = UserType | OperationInfo
+
 union ResetPasswordPayload = UserType | OperationInfo
+
+union RevokePermissionPayload = PermissionType | RoleError | OperationInfo
 
 union RevokeRolePayload = UserType | RoleError | OperationInfo
 
@@ -395,6 +420,11 @@ input RoleOrder @oneOf {
   name: Ordering
 }
 
+input RolePermissionInput {
+  roleName: String!
+  permissionId: ID!
+}
+
 """Role(id, name)"""
 type RoleType {
   id: ID!
@@ -458,6 +488,10 @@ input StrFilterLookup {
   iRegex: String
 }
 
+union UpdateMyAvatarPayload = UserType | OperationInfo
+
+union UpdateMyProfilePayload = UserType | OperationInfo
+
 union UpdateUserPayload = UserType | OperationInfo
 
 input UserCreateInput {
@@ -516,6 +550,8 @@ type UserType {
   mfaRequired: Boolean!
   nextAccessReviewDate: Date
   mustChangePassword: Boolean!
+  mfaRecoveryCodesRemaining: Int!
+  avatarUrl: String
 }
 
 input UserUpdateInput {

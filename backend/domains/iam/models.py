@@ -83,6 +83,23 @@ class MfaRecoveryCode(models.Model):
         return f"recovery code for {self.user.email} ({'used' if self.used_at else 'unused'})"
 
 
+class UserAvatar(models.Model):
+    """A user's profile photo, re-encoded server-side and held in the database.
+
+    Kept off the `User` row so listing users never drags image bytes along, and
+    stored as bytes rather than on a filesystem so the app needs no separate
+    media volume to back up, restore or protect.
+    """
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="avatar")
+    image = models.BinaryField()
+    content_type = models.CharField(max_length=32, default="image/jpeg")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"avatar for {self.user.email}"
+
+
 class LoginAttempt(models.Model):
     """Audit trail of sign-in attempts, successful or not."""
 
@@ -149,9 +166,13 @@ class IamAuditEvent(models.Model):
         USER_DELETED = "user.deleted", "User deleted"
         ROLE_GRANTED = "role.granted", "Role granted"
         ROLE_REVOKED = "role.revoked", "Role revoked"
+        PERMISSION_GRANTED = "permission.granted", "Permission granted"
+        PERMISSION_REVOKED = "permission.revoked", "Permission revoked"
         MFA_ENABLED = "mfa.enabled", "MFA enabled"
         MFA_DISABLED = "mfa.disabled", "MFA disabled"
         MFA_RESET = "mfa.reset", "MFA reset by admin"
+        MFA_CODES_REGENERATED = "mfa.codes_regenerated", "MFA recovery codes regenerated"
+        PROFILE_UPDATED = "profile.updated", "Profile updated by the account holder"
 
     event_type = models.CharField(max_length=32, choices=EventType.choices)
     actor = models.ForeignKey(

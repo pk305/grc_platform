@@ -3,7 +3,7 @@ import Link from 'next/link';
 import AuthShell from '@/components/auth/AuthShell';
 
 export const metadata: Metadata = {
-  title: 'Sign out · Phoenix'
+  title: 'Sign Out'
 };
 
 export default function SignOutPage() {

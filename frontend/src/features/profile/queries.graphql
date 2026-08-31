@@ -1,0 +1,111 @@
+query MyProfile {
+  me {
+    id
+    email
+    username
+    firstName
+    lastName
+    department
+    avatarUrl
+    isActive
+    isSuperuser
+    authProvider
+    entraObjectId
+    mfaEnabled
+    mfaRequired
+    mfaRecoveryCodesRemaining
+    mustChangePassword
+    nextAccessReviewDate
+    lastLogin
+    dateJoined
+    roles {
+      id
+      name
+    }
+  }
+}
+
+query MyPermissions {
+  permissions(order: { resource: ASC }) {
+    id
+    resource
+    action
+    isoClause
+    roles {
+      id
+      name
+    }
+  }
+}
+
+query MyAuditEvents($limit: Int) {
+  myAuditEvents(limit: $limit) {
+    id
+    eventType
+    actor
+    detail
+    createdAt
+  }
+}
+
+mutation UpdateMyProfile($data: MyProfileInput!) {
+  updateMyProfile(data: $data) {
+    __typename
+    ... on UserType {
+      id
+      firstName
+      lastName
+      department
+    }
+    ... on OperationInfo {
+      messages {
+        field
+        message
+      }
+    }
+  }
+}
+
+mutation RegenerateMfaRecoveryCodes($password: String!) {
+  regenerateMfaRecoveryCodes(password: $password) {
+    __typename
+    ... on MfaRecoveryCodesType {
+      recoveryCodes
+    }
+    ... on OperationInfo {
+      messages {
+        message
+      }
+    }
+  }
+}
+
+mutation UpdateMyAvatar($imageBase64: String!) {
+  updateMyAvatar(imageBase64: $imageBase64) {
+    __typename
+    ... on UserType {
+      id
+      avatarUrl
+    }
+    ... on OperationInfo {
+      messages {
+        message
+      }
+    }
+  }
+}
+
+mutation RemoveMyAvatar {
+  removeMyAvatar {
+    __typename
+    ... on UserType {
+      id
+      avatarUrl
+    }
+    ... on OperationInfo {
+      messages {
+        message
+      }
+    }
+  }
+}

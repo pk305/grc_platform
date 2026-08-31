@@ -149,6 +149,36 @@ mutation IamRevokeRole($data: AssignRoleInput!) {
   }
 }
 
+mutation IamAssignPermission($data: RolePermissionInput!) {
+  assignPermission(data: $data) {
+    ... on PermissionType {
+      id
+      roles {
+        id
+        name
+      }
+    }
+    ... on RoleError {
+      message
+    }
+  }
+}
+
+mutation IamRevokePermission($data: RolePermissionInput!) {
+  revokePermission(data: $data) {
+    ... on PermissionType {
+      id
+      roles {
+        id
+        name
+      }
+    }
+    ... on RoleError {
+      message
+    }
+  }
+}
+
 mutation IamStartAccessReview($userIds: [ID!]!) {
   startAccessReview(userIds: $userIds) {
     id
