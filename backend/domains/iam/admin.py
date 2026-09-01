@@ -52,9 +52,9 @@ class RoleAdmin(admin.ModelAdmin):
 
 @admin.register(LoginAttempt)
 class LoginAttemptAdmin(admin.ModelAdmin):
-    list_display = ("email", "user", "success", "created_at")
+    list_display = ("email", "user", "success", "ip_address", "created_at")
     list_filter = ("success",)
-    readonly_fields = ("email", "user", "success", "created_at")
+    readonly_fields = ("email", "user", "success", "ip_address", "created_at")
 
 
 @admin.register(MfaRecoveryCode)
@@ -75,6 +75,6 @@ class PermissionAdmin(admin.ModelAdmin):
 
 @admin.register(IamAuditEvent)
 class IamAuditEventAdmin(admin.ModelAdmin):
-    list_display = ("event_type", "actor", "target_user", "detail", "created_at")
+    list_display = ("event_type", "actor", "target_user", "detail", "ip_address", "created_at")
     list_filter = ("event_type",)
-    readonly_fields = ("event_type", "actor", "target_user", "detail", "created_at")
+    readonly_fields = ("event_type", "actor", "target_user", "detail", "ip_address", "created_at")

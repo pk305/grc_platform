@@ -13,6 +13,7 @@ from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
+from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
 from django.db import transaction
@@ -21,6 +22,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from strawberry.types import Info
 
+from domains.iam import realtime
 from domains.iam.crypto import decrypt, encrypt
 from domains.iam.images import STORED_CONTENT_TYPE, decode_avatar
 from domains.iam.models import (
@@ -60,9 +62,7 @@ class MfaRequired:
     message: str = "Multi-factor authentication code required."
 
 
-LoginResult = Annotated[
-    UserType | AuthError | MfaRequired, strawberry.union("LoginResult")
-]
+LoginResult = Annotated[UserType | AuthError | MfaRequired, strawberry.union("LoginResult")]
 
 # Session keys tracking a password-verified-but-not-yet-MFA-verified sign-in.
 # `auth_login()` is deliberately NOT called until the code is verified, so
@@ -91,6 +91,32 @@ async def _session_get(request, key: str, default=None):
 
 async def _session_set(request, key: str, value) -> None:
     await sync_to_async(request.session.__setitem__)(key, value)
+
+
+def _enforce_single_session(request, user: User) -> None:
+    """Logs the user in, then evicts any session already open elsewhere.
+
+    ISO/IEC 27001:2022 A.8.5 — limitation of concurrent sessions: only one
+    active session per account. `auth_login` cycles the request's own session
+    key (Django's session-fixation protection), so the previous key recorded
+    on the user is always a *different* browser/device's session; deleting
+    that row invalidates its sessionid cookie for both the HTTP API and the
+    chat websocket, which authenticate off the same session store.
+    """
+    previous_key = user.current_session_key
+    auth_login(request, user)
+    new_key = request.session.session_key
+    if previous_key and previous_key != new_key:
+        Session.objects.filter(session_key=previous_key).delete()
+        realtime.broadcast_session_invalidated(previous_key)
+    if new_key != previous_key:
+        User.objects.filter(pk=user.pk).update(current_session_key=new_key or "")
+
+
+def _clear_current_session_key_sync(request) -> None:
+    user = request.user
+    if user.is_authenticated:
+        User.objects.filter(pk=user.pk).update(current_session_key="")
 
 
 def _verify_mfa_code(user: User, code: str) -> bool:
@@ -133,6 +159,17 @@ def _actor(info: Info) -> User | None:
     return user if user.is_authenticated else None
 
 
+def _client_ip(request) -> str | None:
+    """The connecting socket's address, for the audit trail (A.8.15).
+
+    Only `REMOTE_ADDR` — this app isn't deployed behind a trusted reverse
+    proxy that would strip or overwrite an inbound `X-Forwarded-For`, so
+    trusting that header would let any caller spoof whatever IP lands in
+    the log.
+    """
+    return request.META.get("REMOTE_ADDR")
+
+
 # ISO/IEC 27001:2022 A.5.18 — new access is recertified on a fixed cadence,
 # not left unscheduled until someone remembers to trigger a review.
 NEW_USER_ACCESS_REVIEW_DAYS = 90
@@ -142,19 +179,26 @@ NEW_USER_ACCESS_REVIEW_DAYS = 90
 class IamMutation:
     @strawberry.mutation
     async def login(self, info: Info, email: str, password: str) -> LoginResult:
+        request = info.context.request
+        # request.META is a plain dict, unlike request.user/.session — safe
+        # to read straight off the event loop, no sync_to_async needed.
+        ip_address = _client_ip(request)
         email = email.strip().lower()
         domain = email.rsplit("@", 1)[-1]
         allowed_emails = {e.lower() for e in settings.ALLOWED_LOGIN_EMAILS}
         if email not in allowed_emails and domain != settings.ALLOWED_LOGIN_DOMAIN.lower():
-            await sync_to_async(LoginAttempt.objects.create)(email=email, success=False)
+            await sync_to_async(LoginAttempt.objects.create)(
+                email=email, success=False, ip_address=ip_address
+            )
             return AuthError(
                 message=f"Only @{settings.ALLOWED_LOGIN_DOMAIN} accounts can sign in here."
             )
 
-        request = info.context.request
         user = await sync_to_async(authenticate)(request, username=email, password=password)
         if user is None:
-            await sync_to_async(LoginAttempt.objects.create)(email=email, success=False)
+            await sync_to_async(LoginAttempt.objects.create)(
+                email=email, success=False, ip_address=ip_address
+            )
             return AuthError(message="Invalid email or password.")
 
         if user.mfa_enabled:
@@ -162,8 +206,10 @@ class IamMutation:
             await _session_set(request, MFA_PENDING_ATTEMPTS_KEY, 0)
             return MfaRequired()
 
-        await sync_to_async(auth_login)(request, user)
-        await sync_to_async(LoginAttempt.objects.create)(email=email, user=user, success=True)
+        await sync_to_async(_enforce_single_session)(request, user)
+        await sync_to_async(LoginAttempt.objects.create)(
+            email=email, user=user, success=True, ip_address=ip_address
+        )
         return user  # type: ignore[return-value]
 
     @strawberry.mutation
@@ -182,7 +228,7 @@ class IamMutation:
         if attempts >= MAX_MFA_ATTEMPTS:
             await _clear_mfa_challenge(request)
             await sync_to_async(LoginAttempt.objects.create)(
-                email=user.email, user=user, success=False
+                email=user.email, user=user, success=False, ip_address=_client_ip(request)
             )
             return AuthError(message="Too many attempts. Please sign in again.")
 
@@ -192,13 +238,20 @@ class IamMutation:
             return AuthError(message="Invalid verification code.")
 
         await _clear_mfa_challenge(request)
-        await sync_to_async(auth_login)(request, user)
-        await sync_to_async(LoginAttempt.objects.create)(email=user.email, user=user, success=True)
+        await sync_to_async(_enforce_single_session)(request, user)
+        await sync_to_async(LoginAttempt.objects.create)(
+            email=user.email, user=user, success=True, ip_address=_client_ip(request)
+        )
         return user  # type: ignore[return-value]
 
     @strawberry.mutation
     async def logout(self, info: Info) -> bool:
-        await sync_to_async(auth_logout)(info.context.request)
+        request = info.context.request
+        # `request.user` is a lazy object that hits the DB to resolve —
+        # evaluating it outside sync_to_async would run that query straight
+        # on the event loop.
+        await sync_to_async(_clear_current_session_key_sync)(request)
+        await sync_to_async(auth_logout)(request)
         return True
 
     @strawberry.mutation
@@ -237,9 +290,7 @@ class IamMutation:
         return user  # type: ignore[return-value]
 
     @strawberry_django.mutation(handle_django_errors=True)
-    def change_password(
-        self, info: Info, old_password: str, new_password: str
-    ) -> UserType:
+    def change_password(self, info: Info, old_password: str, new_password: str) -> UserType:
         user = info.context.request.user
         if not user.is_authenticated:
             raise DjangoValidationError("You must be signed in to change your password.")
@@ -267,9 +318,7 @@ class IamMutation:
         user.mfa_secret = encrypt(secret)
         user.save(update_fields=["mfa_secret"])
 
-        uri = pyotp.TOTP(secret).provisioning_uri(
-            name=user.email, issuer_name="Phoenix Platform"
-        )
+        uri = pyotp.TOTP(secret).provisioning_uri(name=user.email, issuer_name="Phoenix Platform")
         return MfaSetupType(secret=secret, provisioning_uri=uri)
 
     @strawberry_django.mutation(handle_django_errors=True)
@@ -294,6 +343,7 @@ class IamMutation:
                 actor=user,
                 target_user=user,
                 detail=user.email,
+                ip_address=_client_ip(info.context.request),
             )
         return MfaConfirmedType(user=user, recovery_codes=codes)  # type: ignore[arg-type]
 
@@ -316,6 +366,7 @@ class IamMutation:
                 actor=user,
                 target_user=user,
                 detail=user.email,
+                ip_address=_client_ip(info.context.request),
             )
         return user  # type: ignore[return-value]
 
@@ -341,6 +392,7 @@ class IamMutation:
                 actor=user,
                 target_user=user,
                 detail=user.email,
+                ip_address=_client_ip(info.context.request),
             )
         return MfaRecoveryCodesType(recovery_codes=codes)
 
@@ -370,6 +422,7 @@ class IamMutation:
             actor=user,
             target_user=user,
             detail=user.email,
+            ip_address=_client_ip(info.context.request),
         )
         return user  # type: ignore[return-value]
 
@@ -396,6 +449,7 @@ class IamMutation:
                 actor=user,
                 target_user=user,
                 detail=f"{user.email} · profile photo updated",
+                ip_address=_client_ip(info.context.request),
             )
         return user  # type: ignore[return-value]
 
@@ -414,6 +468,7 @@ class IamMutation:
                     actor=user,
                     target_user=user,
                     detail=f"{user.email} · profile photo removed",
+                    ip_address=_client_ip(info.context.request),
                 )
         return user  # type: ignore[return-value]
 
@@ -433,6 +488,7 @@ class IamMutation:
                 actor=_actor(info),
                 target_user=user,
                 detail=user.email,
+                ip_address=_client_ip(info.context.request),
             )
         return user  # type: ignore[return-value]
 
@@ -464,6 +520,7 @@ class IamMutation:
             actor=_actor(info),
             target_user=user,
             detail=user.email,
+            ip_address=_client_ip(info.context.request),
         )
         return user  # type: ignore[return-value]
 
@@ -507,6 +564,7 @@ class IamMutation:
                 actor=_actor(info),
                 target_user=user,
                 detail=f"{user.email} ({role.name})",
+                ip_address=_client_ip(info.context.request),
             )
 
         if data.send_welcome_email:
@@ -533,14 +591,13 @@ class IamMutation:
         user.last_name = data.last_name
         user.department = data.department
         user.full_clean(exclude=["password"])
-        user.save(
-            update_fields=["email", "username", "first_name", "last_name", "department"]
-        )
+        user.save(update_fields=["email", "username", "first_name", "last_name", "department"])
         IamAuditEvent.objects.create(
             event_type=IamAuditEvent.EventType.USER_UPDATED,
             actor=_actor(info),
             target_user=user,
             detail=user.email,
+            ip_address=_client_ip(info.context.request),
         )
         return user  # type: ignore[return-value]
 
@@ -565,6 +622,7 @@ class IamMutation:
                 actor=actor,
                 target_user=user,
                 detail=user.email,
+                ip_address=_client_ip(info.context.request),
             )
         return user  # type: ignore[return-value]
 
@@ -585,6 +643,7 @@ class IamMutation:
             event_type=IamAuditEvent.EventType.USER_DELETED,
             actor=actor,
             detail=email,
+            ip_address=_client_ip(info.context.request),
         )
         return user  # type: ignore[return-value]
 
@@ -601,6 +660,7 @@ class IamMutation:
             actor=_actor(info),
             target_user=user,
             detail=f"{role.name} → {user.email}",
+            ip_address=_client_ip(info.context.request),
         )
         return user  # type: ignore[return-value]
 
@@ -626,6 +686,7 @@ class IamMutation:
             actor=_actor(info),
             target_user=user,
             detail=f"{role.name} → {user.email}",
+            ip_address=_client_ip(info.context.request),
         )
         return user  # type: ignore[return-value]
 
@@ -641,6 +702,7 @@ class IamMutation:
             event_type=IamAuditEvent.EventType.PERMISSION_GRANTED,
             actor=_actor(info),
             detail=f"{permission.resource}:{permission.action} → {role.name}",
+            ip_address=_client_ip(info.context.request),
         )
         return permission  # type: ignore[return-value]
 
@@ -656,5 +718,6 @@ class IamMutation:
             event_type=IamAuditEvent.EventType.PERMISSION_REVOKED,
             actor=_actor(info),
             detail=f"{permission.resource}:{permission.action} → {role.name}",
+            ip_address=_client_ip(info.context.request),
         )
         return permission  # type: ignore[return-value]

@@ -44,13 +44,15 @@ class User(AbstractUser):
     # is the administrative flag that an account must complete enrollment.
     mfa_enabled = models.BooleanField("MFA enabled", default=False)
     mfa_required = models.BooleanField("MFA setup required", default=False)
-    mfa_secret = models.CharField(
-        "Encrypted TOTP secret", max_length=255, blank=True, default=""
-    )
+    mfa_secret = models.CharField("Encrypted TOTP secret", max_length=255, blank=True, default="")
     next_access_review_date = models.DateField(blank=True, null=True)
-    must_change_password = models.BooleanField(
-        "Must change password at next login", default=False
-    )
+    must_change_password = models.BooleanField("Must change password at next login", default=False)
+    # A.8.5 — limitation of concurrent sessions: the session_key of this
+    # user's one allowed active session. A new sign-in overwrites it and
+    # deletes the Django session row it used to point at, so any other
+    # browser/device holding the old sessionid cookie is logged out on its
+    # next request. See IamMutation.login / verify_mfa_code.
+    current_session_key = models.CharField(max_length=40, blank=True, default="")
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
@@ -108,6 +110,9 @@ class LoginAttempt(models.Model):
         User, blank=True, null=True, on_delete=models.SET_NULL, related_name="login_attempts"
     )
     success = models.BooleanField()
+    # A.8.15 — logging: the connecting client's address, for spotting
+    # brute-force/credential-stuffing patterns across attempts.
+    ip_address = models.GenericIPAddressField("IP address", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -183,6 +188,10 @@ class IamAuditEvent(models.Model):
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
     detail = models.TextField(blank=True)
+    # A.8.15 — logging: the actor's connecting address at the time of the
+    # action. Null for events with no request behind them (e.g. none today,
+    # but the column stays optional for any that end up system-initiated).
+    ip_address = models.GenericIPAddressField("IP address", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

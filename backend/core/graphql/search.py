@@ -14,13 +14,9 @@ from strawberry.types import Info
 from domains.iam.models import Role, User
 from domains.risk.models import Risk
 
-# Results returned per record kind. The navbar shows a short list and links
-# through to the full page, so this stays small on purpose.
 DEFAULT_SEARCH_LIMIT = 5
 MAX_SEARCH_LIMIT = 20
 
-# Below this, a query matches too much to be useful (and every keystroke of a
-# one-character term would scan every table).
 MIN_SEARCH_TERM_LENGTH = 2
 
 
@@ -46,8 +42,6 @@ def _risk_result(risk: Risk) -> SearchResult:
         kind="risk",
         label=risk.title,
         sublabel=f"{risk.reference} · {risk.get_status_display()}",
-        # The register filters itself from `q`, so the link lands on the row
-        # rather than on an unfiltered table the user has to search again.
         url=f"/risk-register?q={risk.reference}",
     )
 

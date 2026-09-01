@@ -29,6 +29,7 @@ type AuditEventType {
   actor: String!
   detail: String!
   createdAt: DateTime!
+  ipAddress: String
 }
 
 type AuditSummary {
@@ -584,6 +585,7 @@ type Subscription {
   chatContactUpdated: ChatContactType!
   chatTypingChanged(conversationId: ID!): ChatTypingEvent!
   chatPresenceChanged: ChatPresenceEvent!
+  sessionInvalidated: Boolean!
 }
 
 union UpdateMyAvatarPayload = UserType | OperationInfo

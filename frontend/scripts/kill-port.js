@@ -1,6 +1,9 @@
 #!/usr/bin/env node
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { execSync } = require('child_process');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path');
 
 const port = process.env.PORT || 3000;
@@ -13,7 +16,9 @@ function killPid(pid) {
 }
 
 try {
-  const pids = execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, { stdio: ['ignore', 'pipe', 'ignore'] })
+  const pids = execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, {
+    stdio: ['ignore', 'pipe', 'ignore']
+  })
     .toString()
     .trim()
     .split('\n')

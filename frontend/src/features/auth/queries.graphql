@@ -56,6 +56,13 @@ mutation Logout {
   logout
 }
 
+# Fires once, when a sign-in elsewhere evicts this browser's session (see
+# _enforce_single_session in backend/domains/iam/graphql/mutations.py) — lets
+# SessionWatcher react immediately instead of waiting for the next query.
+subscription SessionInvalidated {
+  sessionInvalidated
+}
+
 mutation RequestPasswordReset($email: String!) {
   requestPasswordReset(email: $email)
 }

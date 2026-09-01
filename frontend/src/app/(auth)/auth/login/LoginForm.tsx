@@ -8,7 +8,7 @@ import {
   useState,
   type CSSProperties
 } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button, IconButton, Text, TextField } from '@/components/ui';
@@ -35,7 +35,9 @@ const MESSAGES = {
   domainNotAllowed: `Only @${ALLOWED_EMAIL_DOMAIN} accounts can sign in here.`,
   unavailable: 'Sign-in is unavailable right now. Try again in a few minutes.',
   codeRequired: 'Enter the 6-digit code from your authenticator app.',
-  invalidCode: 'That code is incorrect.'
+  invalidCode: 'That code is incorrect.',
+  signedOutElsewhere:
+    'You were signed out because your account signed in from another browser.'
 } as const;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -231,7 +233,10 @@ function MfaChallengeForm({
 
 export default function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
+  const signedOutElsewhere =
+    searchParams.get('reason') === 'concurrent-session';
 
   const passwordHelpId = useId();
 
@@ -333,6 +338,12 @@ export default function LoginForm() {
                   Use your organisation account to continue.
                 </p>
               </div>
+
+              {signedOutElsewhere && (
+                <div className="alert alert-danger py-2 mb-3" role="alert">
+                  {MESSAGES.signedOutElsewhere}
+                </div>
+              )}
 
               <a
                 href={SSO_ENTRY_URL}

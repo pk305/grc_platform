@@ -3,6 +3,7 @@ import { Nunito_Sans, Poppins } from 'next/font/google';
 import ThemeInit from '@/components/ThemeInit';
 import ApolloProviderWrapper from '@/lib/apollo/ApolloProviderWrapper';
 import { AuthProvider } from '@/features/auth/AuthContext';
+import SessionWatcher from '@/features/auth/SessionWatcher';
 import {
   ThemeProvider,
   THEME_STORAGE_KEY
@@ -85,6 +86,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <ApolloProviderWrapper>
             <AuthProvider>
               <ToastProvider>
+                <SessionWatcher />
                 <main>{children}</main>
               </ToastProvider>
             </AuthProvider>

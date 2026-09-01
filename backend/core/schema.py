@@ -11,6 +11,7 @@ from domains.chat.graphql.subscriptions import ChatSubscription
 from domains.controls.graphql.queries import ControlsQuery
 from domains.iam.graphql.mutations import IamMutation
 from domains.iam.graphql.queries import IamQuery
+from domains.iam.graphql.subscriptions import IamSubscription
 from domains.incidents.graphql.queries import IncidentsQuery
 from domains.notifications.graphql.mutations import NotificationsMutation
 from domains.notifications.graphql.queries import NotificationsQuery
@@ -40,7 +41,7 @@ class Mutation(IamMutation, RiskMutation, NotificationsMutation, ChatMutation):
 
 
 @strawberry.type
-class Subscription(ChatSubscription):
+class Subscription(ChatSubscription, IamSubscription):
     pass
 
 

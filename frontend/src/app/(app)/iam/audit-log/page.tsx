@@ -76,6 +76,14 @@ const columns = columnHelper.columns([
       </Text>
     )
   }),
+  columnHelper.accessor('ipAddress', {
+    header: 'IP address',
+    cell: ({ getValue }) => (
+      <Text size="2" color="gray" style={{ fontFamily: 'monospace' }}>
+        {getValue() || '—'}
+      </Text>
+    )
+  }),
   columnHelper.accessor('createdAt', {
     header: 'When',
     sortFn: 'datetime',
@@ -119,12 +127,13 @@ export default function AuditLogPage() {
   }
 
   function exportLog() {
-    const header = 'event,actor,detail,timestamp';
+    const header = 'event,actor,detail,ip_address,timestamp';
     const lines = events.map(event =>
       [
         event.eventType,
         csvField(event.actor),
         csvField(event.detail),
+        event.ipAddress ?? '',
         new Date(String(event.createdAt)).toISOString()
       ].join(',')
     );

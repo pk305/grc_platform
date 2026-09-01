@@ -51,6 +51,7 @@ query IamAuditEvents($limit: Int) {
     eventType
     actor
     detail
+    ipAddress
     createdAt
   }
 }

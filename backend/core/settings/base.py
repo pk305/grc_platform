@@ -19,10 +19,6 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
-# Fernet key encrypting MFA (TOTP) secrets at rest. Falls back to a key
-# derived from SECRET_KEY for convenience — production deployments should
-# set an explicit MFA_ENCRYPTION_KEY so rotating SECRET_KEY doesn't also
-# invalidate every enrolled user's MFA secret.
 MFA_ENCRYPTION_KEY = env(
     "MFA_ENCRYPTION_KEY",
     default=base64.urlsafe_b64encode(hashlib.sha256(SECRET_KEY.encode()).digest()),

@@ -32,6 +32,7 @@ def _admin_event(event: IamAuditEvent) -> AuditEventType:
         actor=event.actor.email if event.actor else "System",
         detail=event.detail,
         created_at=event.created_at,
+        ip_address=event.ip_address,
     )
 
 
@@ -46,6 +47,7 @@ def _login_event(attempt: LoginAttempt) -> AuditEventType:
             else "Local"
         ),
         created_at=attempt.created_at,
+        ip_address=attempt.ip_address,
     )
 
 

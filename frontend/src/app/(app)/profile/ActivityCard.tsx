@@ -57,6 +57,7 @@ export function ActivityCard() {
               </Text>
               <Text as="div" size="1" color="gray">
                 {event.actor}
+                {event.ipAddress ? ` · ${event.ipAddress}` : ''}
               </Text>
             </Box>
             <Text

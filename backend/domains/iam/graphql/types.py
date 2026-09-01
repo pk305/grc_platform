@@ -153,6 +153,7 @@ class AuditEventType:
     actor: str
     detail: str
     created_at: datetime.datetime
+    ip_address: str | None = None
 
 
 @strawberry.type
