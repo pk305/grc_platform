@@ -220,6 +220,15 @@ SET_MFA_REQUIRED = """
   }
 """
 
+ADMIN_RESET_PASSWORD = """
+  mutation($userId: ID!) {
+    adminResetPassword(userId: $userId) {
+      ... on UserType { id }
+      ... on OperationInfo { messages { kind message } }
+    }
+  }
+"""
+
 
 def test_users_query_returns_users(gql_client: GraphQLTestClient) -> None:
     UserFactory.create_batch(2)
@@ -1054,6 +1063,48 @@ def test_admin_reset_mfa_clears_enrollment(
     event = IamAuditEvent.objects.get(event_type=IamAuditEvent.EventType.MFA_RESET)
     assert event.target_user == target
     assert event.actor == actor
+
+
+def test_admin_reset_password_requires_admin(gql_client: GraphQLTestClient, client: Client) -> None:
+    actor = UserFactory()
+    target = UserFactory()
+    client.force_login(actor)
+
+    result = gql_client.query(ADMIN_RESET_PASSWORD, variables={"userId": str(target.pk)})
+
+    assert result.data["adminResetPassword"]["messages"][0]["kind"] == "PERMISSION"
+    assert len(mail.outbox) == 0
+
+
+def test_admin_reset_password_sends_email(gql_client: GraphQLTestClient, client: Client) -> None:
+    admin_role = RoleFactory(name=Role.Name.ADMIN)
+    actor = UserFactory(roles=[admin_role])
+    target = UserFactory()
+    client.force_login(actor)
+
+    result = gql_client.query(ADMIN_RESET_PASSWORD, variables={"userId": str(target.pk)})
+
+    assert result.data["adminResetPassword"]["id"] == str(target.pk)
+    assert len(mail.outbox) == 1
+    assert target.email in mail.outbox[0].to
+    assert "/auth/reset-password?uid=" in mail.outbox[0].body
+    event = IamAuditEvent.objects.get(event_type=IamAuditEvent.EventType.PASSWORD_RESET_REQUESTED)
+    assert event.target_user == target
+    assert event.actor == actor
+
+
+def test_admin_reset_password_rejects_sso_account(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    admin_role = RoleFactory(name=Role.Name.ADMIN)
+    actor = UserFactory(roles=[admin_role])
+    target = UserFactory(auth_provider=User.AuthProvider.ENTRA_ID)
+    client.force_login(actor)
+
+    result = gql_client.query(ADMIN_RESET_PASSWORD, variables={"userId": str(target.pk)})
+
+    assert "no local password" in result.data["adminResetPassword"]["messages"][0]["message"]
+    assert len(mail.outbox) == 0
 
 
 def test_set_mfa_required_requires_admin(gql_client: GraphQLTestClient, client: Client) -> None:

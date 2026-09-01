@@ -4,9 +4,11 @@ Every function here takes the acting user and enforces membership itself, so a
 caller can never read or post into a thread they don't belong to by guessing an
 id. The GraphQL layer above is a thin translation of these functions.
 
-Reads are built to survive polling: the contacts rail is one request that the
-client repeats on an interval, so it resolves in a fixed handful of queries
-regardless of how many colleagues or threads exist.
+`contacts()` still resolves in a fixed handful of queries regardless of how
+many colleagues or threads exist — it no longer needs to survive being polled
+every few seconds, but a page load still shouldn't cost a query per row.
+Realtime delivery (new messages, presence) is `realtime.py`'s job; this module
+only calls into it, and never touches a channel layer directly.
 """
 
 import datetime
@@ -18,18 +20,17 @@ from django.utils import timezone
 
 from domains.iam.models import User
 
-from .models import Conversation, Message, Participation, Presence
-
-# How recently someone must have sent a heartbeat to show as online. Generous
-# enough to cover a missed beat or a slow network, short enough that a closed
-# tab goes grey while the person is still plausibly away.
-ONLINE_WINDOW = datetime.timedelta(minutes=2)
+from . import realtime
+from .images import decode_chat_photo
+from .models import Conversation, Message, MessageAttachment, Participation, Presence
 
 # One window's worth of scrollback. The dock's windows are small; anything
 # older is history nobody is reading in a 20-line box.
 MESSAGE_PAGE_SIZE = 50
 
 MAX_MESSAGE_LENGTH = 4000
+
+MAX_ATTACHMENTS_PER_MESSAGE = 10
 
 # Longest preview the contacts rail will show, before the client's own
 # truncation. Keeps the payload small when someone pastes an essay.
@@ -53,24 +54,9 @@ class Contact:
     last_message_at: datetime.datetime | None
 
 
-def _online_since() -> datetime.datetime:
-    return timezone.now() - ONLINE_WINDOW
-
-
 def display_name(user: User) -> str:
     """What to print above a message. Falls back to the login identifier."""
     return f"{user.first_name} {user.last_name}".strip() or user.email
-
-
-def touch_presence(user: User) -> None:
-    """Record that `user` is currently active. Called by the client heartbeat."""
-    if not user.is_authenticated:
-        return
-    # auto_now on the model means saving is enough to move the timestamp; the
-    # get_or_create path covers a user who has never sent a beat before.
-    presence, created = Presence.objects.get_or_create(user=user)
-    if not created:
-        presence.save(update_fields=["last_seen_at"])
 
 
 def _conversation_ids_for(user: User) -> QuerySet[Participation]:
@@ -134,6 +120,28 @@ def _unread_counts(
     return {row["conversation_id"]: row["total"] for row in rows}
 
 
+def _build_contact(
+    user: User,
+    person: User,
+    threads: dict[int, tuple[Conversation, Participation]],
+    unread: dict[int, int],
+    seen: dict[int, datetime.datetime | None],
+) -> Contact:
+    thread = threads.get(person.pk)
+    conversation = thread[0] if thread else None
+    return Contact(
+        user=person,
+        online=realtime.is_online(person.pk),
+        last_seen_at=seen.get(person.pk),
+        conversation_id=conversation.pk if conversation else None,
+        unread_count=unread.get(conversation.pk, 0) if conversation else 0,
+        last_message_preview=((conversation.preview or "") if conversation else "")[
+            :PREVIEW_LENGTH
+        ],
+        last_message_at=conversation.last_message_at if conversation else None,
+    )
+
+
 def contacts(user: User, search: str = "", limit: int | None = None) -> list[Contact]:
     """The colleagues `user` can message, ordered the way the rail shows them.
 
@@ -155,27 +163,11 @@ def contacts(user: User, search: str = "", limit: int | None = None) -> list[Con
 
     threads = _direct_threads(user)
     unread = _unread_counts(user, threads)
-    online_since = _online_since()
-    seen = dict(Presence.objects.filter(user__in=people).values_list("user_id", "last_seen_at"))
+    seen: dict[int, datetime.datetime | None] = dict(
+        Presence.objects.filter(user__in=people).values_list("user_id", "last_seen_at")
+    )
 
-    results = []
-    for person in people:
-        thread = threads.get(person.pk)
-        conversation = thread[0] if thread else None
-        last_seen_at = seen.get(person.pk)
-        results.append(
-            Contact(
-                user=person,
-                online=last_seen_at is not None and last_seen_at >= online_since,
-                last_seen_at=last_seen_at,
-                conversation_id=conversation.pk if conversation else None,
-                unread_count=unread.get(conversation.pk, 0) if conversation else 0,
-                last_message_preview=((conversation.preview or "") if conversation else "")[
-                    :PREVIEW_LENGTH
-                ],
-                last_message_at=conversation.last_message_at if conversation else None,
-            )
-        )
+    results = [_build_contact(user, person, threads, unread, seen) for person in people]
 
     # Unread first — that is what the rail exists to surface — then whoever
     # spoke most recently, then everyone else alphabetically, online or not.
@@ -188,6 +180,24 @@ def contacts(user: User, search: str = "", limit: int | None = None) -> list[Con
         )
     )
     return results[:limit] if limit else results
+
+
+def contact(user: User, other_id: int) -> Contact | None:
+    """One colleague as the rail would show them.
+
+    The realtime path's per-row equivalent of `contacts()` — a
+    `chatContactUpdated` event names only the row that changed, so there's no
+    need to rebuild the whole list to refresh one of them.
+    """
+    person = User.objects.filter(pk=other_id, is_active=True).exclude(pk=user.pk).first()
+    if person is None:
+        return None
+    threads = _direct_threads(user)
+    unread = _unread_counts(user, threads)
+    seen: dict[int, datetime.datetime | None] = dict(
+        Presence.objects.filter(user=person).values_list("user_id", "last_seen_at")
+    )
+    return _build_contact(user, person, threads, unread, seen)
 
 
 def unread_total(user: User) -> int:
@@ -242,6 +252,7 @@ def messages(conversation: Conversation, limit: int = MESSAGE_PAGE_SIZE) -> list
     newest_first = (
         Message.objects.filter(conversation=conversation)
         .select_related("sender")
+        .prefetch_related("attachments")
         .order_by("-created_at", "-id")[: max(1, min(limit, MESSAGE_PAGE_SIZE))]
     )
     return list(reversed(list(newest_first)))
@@ -249,21 +260,26 @@ def messages(conversation: Conversation, limit: int = MESSAGE_PAGE_SIZE) -> list
 
 def send_message(
     sender: User,
-    body: str,
+    body: str | None,
     conversation: Conversation | None = None,
     recipient: User | None = None,
+    photos: list[str] | None = None,
 ) -> Message:
-    """Post `body` into an existing thread, or into a new one with `recipient`.
+    """Post `body` (and/or `photos`) into an existing thread, or a new one with
+    `recipient`.
 
     Accepting a recipient is what lets the UI open a chat window and send in
     one action: the thread comes into existence with its first message, so
     clicking a name and changing your mind leaves nothing behind.
     """
-    text = body.strip()
-    if not text:
+    text = (body or "").strip()
+    photos = photos or []
+    if not text and not photos:
         raise ValueError("A message cannot be empty.")
     if len(text) > MAX_MESSAGE_LENGTH:
         raise ValueError(f"A message cannot be longer than {MAX_MESSAGE_LENGTH} characters.")
+    if len(photos) > MAX_ATTACHMENTS_PER_MESSAGE:
+        raise ValueError(f"A message can carry at most {MAX_ATTACHMENTS_PER_MESSAGE} photos.")
 
     if conversation is None:
         if recipient is None:
@@ -274,14 +290,45 @@ def send_message(
             raise ValueError("That account is deactivated.")
         conversation = direct_conversation(sender, recipient)
 
+    # Decoded before the transaction opens: image processing is CPU work, not
+    # something to do while holding row locks.
+    decoded = [decode_chat_photo(photo) for photo in photos]
+
     with transaction.atomic():
         message = Message.objects.create(conversation=conversation, sender=sender, body=text)
+        if decoded:
+            MessageAttachment.objects.bulk_create(
+                [
+                    MessageAttachment(
+                        message=message,
+                        image=image_bytes,
+                        content_type="image/jpeg",
+                        width=width,
+                        height=height,
+                    )
+                    for image_bytes, width, height in decoded
+                ]
+            )
         # Sending is also reading: the sender's own message must never come
         # back to them as unread.
         Participation.objects.filter(conversation=conversation, user=sender).update(
             last_read_at=message.created_at
         )
         Conversation.objects.filter(pk=conversation.pk).update(last_message_at=message.created_at)
+
+    recipient_id = (
+        Participation.objects.filter(conversation=conversation)
+        .exclude(user=sender)
+        .values_list("user_id", flat=True)
+        .first()
+    )
+    if recipient_id is not None:
+        realtime.broadcast_new_message(
+            conversation_id=conversation.pk,
+            message_id=message.pk,
+            sender_id=sender.pk,
+            recipient_id=recipient_id,
+        )
     return message
 
 

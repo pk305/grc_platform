@@ -173,6 +173,7 @@ class IamAuditEvent(models.Model):
         MFA_RESET = "mfa.reset", "MFA reset by admin"
         MFA_CODES_REGENERATED = "mfa.codes_regenerated", "MFA recovery codes regenerated"
         PROFILE_UPDATED = "profile.updated", "Profile updated by the account holder"
+        PASSWORD_RESET_REQUESTED = "password.reset_requested", "Password reset requested by admin"
 
     event_type = models.CharField(max_length=32, choices=EventType.choices)
     actor = models.ForeignKey(

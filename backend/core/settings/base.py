@@ -29,6 +29,9 @@ MFA_ENCRYPTION_KEY = env(
 )
 
 INSTALLED_APPS = [
+    # Must be first: this is what makes `runserver` patch itself into an
+    # ASGI+WebSocket server in dev, instead of plain WSGI.
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -38,6 +41,7 @@ INSTALLED_APPS = [
     # third-party
     "corsheaders",
     "strawberry_django",
+    "channels",
     # local
     "domains.iam",
     "domains.risk",
@@ -115,6 +119,45 @@ FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@acentriagroup.com")
 # Defaults to printing emails to the console; set a real backend via env in production.
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+
+# Microsoft Graph app registration used to create Teams meetings for chat
+# calls (domains.chat.calls). Left unset in dev — calling fails with a clear
+# "not configured" error rather than a broken button. See .env.example.
+MS_GRAPH_TENANT_ID = env("MS_GRAPH_TENANT_ID", default="")
+MS_GRAPH_CLIENT_ID = env("MS_GRAPH_CLIENT_ID", default="")
+MS_GRAPH_CLIENT_SECRET = env("MS_GRAPH_CLIENT_SECRET", default="")
+
+# Backs the Channels layer that carries chat's realtime events (new messages,
+# rail updates, presence) between ASGI workers — see domains/chat/realtime.py.
+REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/1")
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            # `socket_timeout` must exceed RedisChannelLayer.brpop_timeout
+            # (5s, hardcoded): channels_redis polls with a 5s blocking Redis
+            # read and treats an empty reply as "nothing yet, poll again" —
+            # but with no explicit socket_timeout, newer redis-py versions
+            # default to a *shorter* client-side socket read timeout, so the
+            # client's own socket gives up before Redis's 5s blocking call
+            # even returns, surfacing as a `redis.exceptions.TimeoutError`
+            # that kills the socket's dispatch loop on every idle cycle.
+            "hosts": [{"address": REDIS_URL, "socket_timeout": 20}],
+        },
+    }
+}
+
+# The "is someone online" counters realtime.py keeps, one connection-count
+# per user. A separate cache alias (rather than reusing "default") so the
+# test settings can swap it for an in-process backend without affecting
+# anything else that might use caching later.
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "chat_presence": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    },
+}
 
 # https://strawberry.rocks/docs/django/guide/settings
 STRAWBERRY_DJANGO = {

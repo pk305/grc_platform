@@ -26,6 +26,7 @@
     "echarts": "^5.2.2",
     "feather-icons": "^4.28.0",
     "graphql": "^16.14.2",
+    "graphql-ws": "^6.2.1",
     "is_js": "^0.9.0",
     "leaflet": "^1.7.1",
     "leaflet.markercluster": "^1.5.3",

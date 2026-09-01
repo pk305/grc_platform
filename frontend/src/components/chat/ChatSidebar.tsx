@@ -4,13 +4,6 @@ import { useMemo, useState } from 'react';
 import { useChat } from '@/features/chat/ChatContext';
 import ChatAvatar from './ChatAvatar';
 
-/**
- * The contacts rail down the right edge.
- *
- * Filtering happens here rather than through the query's `search` argument:
- * the full list is already in hand and polling, so narrowing it locally is
- * instant and doesn't reset the poll or churn the cache on every keystroke.
- */
 export default function ChatSidebar() {
   const { contacts, loading, openChat, railOpen, toggleRail } = useChat();
   const [search, setSearch] = useState('');
@@ -73,7 +66,7 @@ export default function ChatSidebar() {
                 onClick={() => openChat(contact.id)}
               >
                 <ChatAvatar
-                  name={contact.participant.name}
+                  name={''}
                   src={contact.participant.avatarUrl}
                   online={contact.participant.online}
                 />

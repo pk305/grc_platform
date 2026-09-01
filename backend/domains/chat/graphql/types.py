@@ -25,6 +25,14 @@ class ChatParticipantType:
 
 
 @strawberry.type
+class ChatAttachmentType:
+    id: strawberry.ID
+    url: str
+    width: int
+    height: int
+
+
+@strawberry.type
 class ChatMessageType:
     id: strawberry.ID
     conversation_id: strawberry.ID
@@ -34,6 +42,7 @@ class ChatMessageType:
     # Which side of the window the bubble goes on. Decided here rather than by
     # comparing ids in the client, so every client agrees.
     mine: bool
+    attachments: list[ChatAttachmentType]
 
 
 @strawberry.type
@@ -119,6 +128,15 @@ def to_message_types(messages: list, viewer: User) -> list[ChatMessageType]:
             created_at=message.created_at,
             sender=to_participant_type(message.sender, avatars=avatars),
             mine=message.sender_id == viewer.pk,
+            attachments=[
+                ChatAttachmentType(
+                    id=strawberry.ID(str(attachment.pk)),
+                    url=to_data_url(attachment.image, attachment.content_type),
+                    width=attachment.width,
+                    height=attachment.height,
+                )
+                for attachment in message.attachments.all()
+            ],
         )
         for message in messages
     ]

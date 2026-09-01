@@ -13,6 +13,7 @@ import {
 } from '@radix-ui/themes';
 import {
   useIamAdminResetMfaMutation,
+  useIamAdminResetPasswordMutation,
   useIamAssignRoleMutation,
   useIamDeleteUserMutation,
   useIamRevokeRoleMutation,
@@ -23,6 +24,8 @@ import type {
   IamRolesQuery,
   IamUsersQuery
 } from '@/features/iam/__generated__/queries.generated';
+import { IamUserAuthProviderEnum } from '@/gql/graphql-types';
+import { useToast } from '@/components/common/Toast';
 import { roleLabel } from '@/lib/iam-roles';
 
 export type IamUserRow = IamUsersQuery['users'][number];
@@ -44,6 +47,7 @@ export function ManageUserDialog({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isSelf = user.id === currentUserId;
+  const showToast = useToast();
 
   const [setUserActive] = useIamSetUserActiveMutation();
   const [assignRole] = useIamAssignRoleMutation();
@@ -52,6 +56,8 @@ export function ManageUserDialog({
   const [setMfaRequired] = useIamSetMfaRequiredMutation();
   const [adminResetMfa, { loading: resettingMfa }] =
     useIamAdminResetMfaMutation();
+  const [adminResetPassword, { loading: resettingPassword }] =
+    useIamAdminResetPasswordMutation();
 
   const heldRoleNames = new Set(user.roles.map(role => role.name));
 
@@ -121,6 +127,17 @@ export function ManageUserDialog({
       return;
     }
     onChanged();
+  }
+
+  async function handleResetPassword() {
+    setError(null);
+    const result = await adminResetPassword({ variables: { userId: user.id } });
+    const payload = result.data?.adminResetPassword;
+    if (payload && 'messages' in payload) {
+      setError(payload.messages.map(m => m.message).join(' '));
+      return;
+    }
+    showToast(`Password reset email sent to ${user.email}.`, 'success');
   }
 
   async function handleDelete() {
@@ -252,6 +269,26 @@ export function ManageUserDialog({
               </Text>
             )}
           </Flex>
+
+          {user.authProvider === IamUserAuthProviderEnum.Local && (
+            <Flex direction="column" gap="2">
+              <Text size="2" weight="medium">
+                Password
+              </Text>
+              <Flex align="center">
+                <Button
+                  variant="soft"
+                  color="gray"
+                  size="1"
+                  onClick={handleResetPassword}
+                  loading={resettingPassword}
+                >
+                  <span className="fas fa-key" aria-hidden="true" />
+                  Send password reset email
+                </Button>
+              </Flex>
+            </Flex>
+          )}
 
           {error && (
             <Callout.Root color="amber" size="1">

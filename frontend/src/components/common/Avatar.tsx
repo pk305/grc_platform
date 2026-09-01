@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import { getFirstLetter } from '@/lib/text';
 
 export default function Avatar({
   size = '2xl',
   round = 'circle',
-  img = 'team/avatar-placeholder.png',
+  img = 'avatar/avatar.jpeg',
   src,
   contentClass = '',
   name,
@@ -39,8 +40,15 @@ export default function Avatar({
   if (src) {
     return (
       <div className={wrapperClass}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className={`rounded-${round}`} src={src} alt="" />
+        <Image
+          className={`rounded-${round}`}
+          src={src}
+          alt=""
+          fill
+          sizes="64px"
+          style={{ objectFit: 'cover' }}
+          unoptimized
+        />
       </div>
     );
   }
@@ -91,16 +99,34 @@ export default function Avatar({
     return (
       <div className={wrapperClass}>
         <div className="rounded-circle overflow-hidden h-100 d-flex">
-          <div className="w-50 border-end">
-            <img src={`/assets/img/${img[0]}`} alt="" />
+          <div className="w-50 border-end position-relative">
+            <Image
+              src={`/assets/img/${img[0]}`}
+              alt=""
+              fill
+              sizes="32px"
+              style={{ objectFit: 'cover' }}
+            />
           </div>
           <div className="w-50 d-flex flex-column">
-            <img
-              className="h-50 border-bottom"
-              src={`/assets/img/${img[1]}`}
-              alt=""
-            />
-            <img className="h-50" src={`/assets/img/${img[2]}`} alt="" />
+            <div className="h-50 border-bottom position-relative">
+              <Image
+                src={`/assets/img/${img[1]}`}
+                alt=""
+                fill
+                sizes="32px"
+                style={{ objectFit: 'cover' }}
+              />
+            </div>
+            <div className="h-50 position-relative">
+              <Image
+                src={`/assets/img/${img[2]}`}
+                alt=""
+                fill
+                sizes="32px"
+                style={{ objectFit: 'cover' }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -109,7 +135,14 @@ export default function Avatar({
 
   return (
     <div className={wrapperClass}>
-      <img className={`rounded-${round}`} src={`/assets/img/${img}`} alt="" />
+      <Image
+        className={`rounded-${round}`}
+        src={`/assets/img/${img}`}
+        alt=""
+        fill
+        sizes="64px"
+        style={{ objectFit: 'cover' }}
+      />
     </div>
   );
 }

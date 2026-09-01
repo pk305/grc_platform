@@ -12,7 +12,8 @@ import {
 import { useAuth } from '@/features/auth/AuthContext';
 import {
   useChatContactsQuery,
-  useChatHeartbeatMutation,
+  useChatContactUpdatedSubscription,
+  useChatPresenceChangedSubscription,
   useMarkChatReadMutation,
   useOpenChatConversationMutation,
   type ChatContactsQuery
@@ -28,16 +29,6 @@ export interface ChatWindowState {
   conversationId: string | null;
   minimized: boolean;
 }
-
-/**
- * How often the rail asks for fresh contacts. Also how long a message can sit
- * unseen, so it is short enough to feel live without a socket, and long enough
- * that a tab left open all day isn't a load problem.
- */
-const POLL_INTERVAL_MS = 10000;
-
-/** Comfortably inside the two-minute window the server calls "online". */
-const HEARTBEAT_INTERVAL_MS = 45000;
 
 /**
  * How many windows the dock will hold. Facebook's bar drops the oldest window
@@ -100,9 +91,9 @@ function readStoredWindows(key: string): ChatWindowState[] {
 
 function readStoredRail(): boolean {
   try {
-    return localStorage.getItem(RAIL_STORAGE_KEY) !== 'false';
+    return localStorage.getItem(RAIL_STORAGE_KEY) === 'true';
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -119,18 +110,93 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [railOpen, setRailOpen] = useState(readStoredRail);
 
   const { data, loading } = useChatContactsQuery({
-    // Polling stands in for a socket: the backend is request/response, so the
-    // rail asks again rather than being told.
-    pollInterval: POLL_INTERVAL_MS,
+    // One fetch for the initial list; the subscriptions below carry every
+    // update after that.
     fetchPolicy: 'cache-and-network',
     skip: !isAuthenticated
   });
 
-  const [heartbeat] = useChatHeartbeatMutation();
+  // Each incoming row has an `id`, so Apollo's normalized cache merges it
+  // straight into the matching `ChatContactType` entity the query above
+  // already returned — no manual cache write needed here. Being subscribed
+  // is also what keeps this user's own chat socket open for as long as the
+  // tab is, which is what registers them as online to everyone else; there
+  // is no separate heartbeat call.
+  //
+  // This only ever fires because someone else just messaged *you* (see
+  // `chat.rail.update` in domains/chat/realtime.py) — never for your own
+  // sends or for read-state changes — so it doubles as exactly the signal a
+  // browser notification wants. Fired only while the tab is backgrounded:
+  // if it's in front of the user there's nothing a popup would add.
+  useChatContactUpdatedSubscription({
+    skip: !isAuthenticated,
+    onData: ({ data: event }) => {
+      const contact = event.data?.chatContactUpdated;
+      if (
+        !contact ||
+        typeof Notification === 'undefined' ||
+        Notification.permission !== 'granted' ||
+        !document.hidden
+      ) {
+        return;
+      }
+      const notification = new Notification(contact.participant.name, {
+        body: contact.lastMessagePreview || 'sent a message',
+        // Collapses rapid-fire messages from the same person into one
+        // updated popup instead of stacking a fresh one for each.
+        tag: `chat-${contact.id}`
+      });
+      notification.onclick = () => {
+        window.focus();
+        openChat(contact.id);
+        notification.close();
+      };
+    }
+  });
+
+  // Presence isn't keyed by a `ChatContactType` id, so it can't merge itself
+  // in automatically — patched by hand below, onto the shared
+  // `ChatParticipantType` entity (which every contact row, and every message
+  // bubble's sender, already points at).
+  useChatPresenceChangedSubscription({
+    skip: !isAuthenticated,
+    onData: ({ client, data: event }) => {
+      const presence = event.data?.chatPresenceChanged;
+      if (!presence) return;
+      client.cache.modify({
+        id: client.cache.identify({
+          __typename: 'ChatParticipantType',
+          id: presence.userId
+        }),
+        fields: { online: () => presence.online }
+      });
+    }
+  });
+
   const [openConversation] = useOpenChatConversationMutation();
   const [markReadMutation] = useMarkChatReadMutation();
 
-  const contacts = useMemo(() => data?.chatContacts ?? [], [data]);
+  // The query's own row order is a snapshot from whenever it last fetched —
+  // a live `chatContactUpdated` patches a row's fields in place (Apollo
+  // reactivity re-derives `data` for that alone) but never reshuffles the
+  // array, so re-sorting here is what makes a colleague who just messaged
+  // you actually jump to the top instead of waiting for a future reload.
+  // Mirrors the sort `contacts()` does server-side (domains/chat/service.py).
+  const contacts = useMemo(() => {
+    const rows = data?.chatContacts ?? [];
+    return [...rows].sort((a, b) => {
+      if (a.unreadCount > 0 !== b.unreadCount > 0) {
+        return a.unreadCount > 0 ? -1 : 1;
+      }
+      const atA = a.lastMessageAt
+        ? new Date(String(a.lastMessageAt)).getTime()
+        : 0;
+      const atB = b.lastMessageAt
+        ? new Date(String(b.lastMessageAt)).getTime()
+        : 0;
+      return atB - atA;
+    });
+  }, [data]);
 
   // The rail is fixed-position, so the page has to be told to leave it a
   // gutter; a class on <html> is how the vertical navbar does the same thing.
@@ -150,15 +216,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [storageKey, windows]);
 
+  // Asked once per browser, not on every sign-in: 'default' is the only
+  // state a prompt can still change — 'granted' and 'denied' are both
+  // final until the user resets it themselves.
   useEffect(() => {
     if (!isAuthenticated) return;
-    heartbeat().catch(() => {});
-    const timer = setInterval(() => {
-      // A backgrounded tab isn't someone you can reach, so let the dot lapse.
-      if (document.visibilityState === 'visible') heartbeat().catch(() => {});
-    }, HEARTBEAT_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [heartbeat, isAuthenticated]);
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, [isAuthenticated]);
 
   const toggleRail = useCallback(() => {
     setRailOpen(open => {

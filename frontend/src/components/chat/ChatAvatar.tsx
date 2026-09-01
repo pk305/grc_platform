@@ -1,10 +1,5 @@
 import Avatar from '@/components/common/Avatar';
 
-/**
- * A face with a presence dot. The dot is drawn here rather than by `Avatar`'s
- * own `status` prop so it reads the same at every size the chat UI uses, and
- * so an offline contact gets a hollow marker instead of no marker at all.
- */
 export default function ChatAvatar({
   name,
   src,

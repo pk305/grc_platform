@@ -1,8 +1,8 @@
 # Data behind the chat rail and the docked conversation windows.
 #
-# The rail polls `ChatContacts`, which carries everything one row needs —
-# presence, unread count and preview — so a list of colleagues costs one
-# request rather than one per person.
+# `ChatContacts` and `ChatMessages` fetch the initial state once; after that,
+# the three subscriptions below keep everything current — no polling. See
+# ChatContext.tsx (rail + presence) and ChatWindow.tsx (messages).
 
 fragment ChatParticipantFields on ChatParticipantType {
   id
@@ -22,6 +22,12 @@ fragment ChatMessageFields on ChatMessageType {
   mine
   sender {
     ...ChatParticipantFields
+  }
+  attachments {
+    id
+    url
+    width
+    height
   }
 }
 
@@ -47,16 +53,27 @@ query ChatMessages($conversationId: ID!, $limit: Int) {
 # Sending accepts a recipient instead of a thread id, so a window opened from
 # the rail can send its first message before any thread exists.
 mutation SendChatMessage(
-  $body: String!
+  $body: String
   $conversationId: ID
   $recipientId: ID
+  $photos: [String!]
 ) {
   sendChatMessage(
     body: $body
     conversationId: $conversationId
     recipientId: $recipientId
+    photos: $photos
   ) {
     ...ChatMessageFields
+  }
+}
+
+# Creates a Teams meeting and returns its join link. Fails with a plain
+# GraphQL error until an admin sets the MS_GRAPH_* env vars (see
+# domains/chat/calls.py) — the client shows that error inline.
+mutation StartChatCall($recipientId: ID!, $video: Boolean!) {
+  startChatCall(recipientId: $recipientId, video: $video) {
+    joinUrl
   }
 }
 
@@ -75,7 +92,47 @@ mutation MarkChatRead($conversationId: ID!) {
   }
 }
 
-# Keeps the caller's status dot green for colleagues while a tab is open.
-mutation ChatHeartbeat {
-  chatHeartbeat
+# Purely ephemeral — nothing is persisted, this only broadcasts.
+mutation SetChatTyping($conversationId: ID!, $typing: Boolean!) {
+  setChatTyping(conversationId: $conversationId, typing: $typing)
+}
+
+# One open conversation's new messages, for as long as its window is mounted.
+subscription ChatMessageReceived($conversationId: ID!) {
+  chatMessageReceived(conversationId: $conversationId) {
+    ...ChatMessageFields
+  }
+}
+
+# The caller's own rail, one row at a time — whichever contact just sent a
+# message. Mounted for the life of the app: being subscribed is also what
+# makes the current user register as online to everyone else (see
+# ChatPresenceChanged below), so there's no separate heartbeat call.
+subscription ChatContactUpdated {
+  chatContactUpdated {
+    id
+    conversationId
+    unreadCount
+    lastMessagePreview
+    lastMessageAt
+    participant {
+      ...ChatParticipantFields
+    }
+  }
+}
+
+# Every colleague's online/offline transitions.
+subscription ChatPresenceChanged {
+  chatPresenceChanged {
+    userId
+    online
+  }
+}
+
+# Whether the other participant in one open conversation is typing.
+subscription ChatTypingChanged($conversationId: ID!) {
+  chatTypingChanged(conversationId: $conversationId) {
+    userId
+    typing
+  }
 }

@@ -47,6 +47,9 @@ importers:
       graphql:
         specifier: ^16.14.2
         version: 16.14.2
+      graphql-ws:
+        specifier: ^6.2.1
+        version: 6.2.1(graphql@16.14.2)(ws@8.21.3)
       is_js:
         specifier: ^0.9.0
         version: 0.9.0

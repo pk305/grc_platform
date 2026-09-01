@@ -1,17 +1,32 @@
 """Chat over GraphQL — who can see what, and what sending a message does."""
 
-import datetime
+import base64
+import io
 
 import pytest
+from django.core.cache import caches
 from django.test import Client
-from django.utils import timezone
+from PIL import Image
 from strawberry.django.test import GraphQLTestClient
 
-from domains.chat.models import Conversation, Message, Participation, Presence
-from domains.chat.service import ONLINE_WINDOW, direct_conversation
+from domains.chat.models import Conversation, Message, Participation
+from domains.chat.service import MAX_ATTACHMENTS_PER_MESSAGE, direct_conversation
 from domains.iam.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _clear_presence_cache():
+    caches["chat_presence"].clear()
+    yield
+
+
+def _png_data_url(color: str = "blue") -> str:
+    buffer = io.BytesIO()
+    Image.new("RGB", (300, 200), color).save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode()
+
 
 CONTACTS = """
   query($search: String) {
@@ -36,10 +51,22 @@ UNREAD_TOTAL = """
 """
 
 SEND = """
-  mutation($body: String!, $conversationId: ID, $recipientId: ID) {
-    sendChatMessage(body: $body, conversationId: $conversationId, recipientId: $recipientId) {
+  mutation($body: String, $conversationId: ID, $recipientId: ID, $photos: [String!]) {
+    sendChatMessage(
+      body: $body
+      conversationId: $conversationId
+      recipientId: $recipientId
+      photos: $photos
+    ) {
       id body mine conversationId sender { name }
+      attachments { id width height }
     }
+  }
+"""
+
+START_CALL = """
+  mutation($recipientId: ID!, $video: Boolean!) {
+    startChatCall(recipientId: $recipientId, video: $video) { joinUrl }
   }
 """
 
@@ -54,11 +81,6 @@ MARK_READ = """
     markChatRead(conversationId: $conversationId) { conversationId unreadTotal }
   }
 """
-
-HEARTBEAT = """
-  mutation { chatHeartbeat }
-"""
-
 
 @pytest.fixture
 def gql_client(client: Client) -> GraphQLTestClient:
@@ -320,11 +342,14 @@ def test_marking_a_thread_you_are_not_in_is_refused(
     ).exists()
 
 
-def test_a_heartbeat_puts_you_online_for_colleagues(
+def test_a_connected_colleague_reads_as_online(
     gql_client: GraphQLTestClient, client: Client
 ) -> None:
+    # "Online" is a live connection-count check against the presence cache —
+    # domains/chat/tests/test_subscriptions.py covers how that count actually
+    # gets set from a socket connecting/disconnecting.
     colleague = UserFactory()
-    Presence.objects.create(user=colleague)
+    caches["chat_presence"].set(f"chat:presence:{colleague.pk}", 1)
     _sign_in(client)
 
     row = gql_client.query(CONTACTS).data["chatContacts"][0]
@@ -332,12 +357,10 @@ def test_a_heartbeat_puts_you_online_for_colleagues(
     assert row["participant"]["online"] is True
 
 
-def test_a_stale_heartbeat_reads_as_offline(gql_client: GraphQLTestClient, client: Client) -> None:
-    colleague = UserFactory()
-    presence = Presence.objects.create(user=colleague)
-    Presence.objects.filter(pk=presence.pk).update(
-        last_seen_at=timezone.now() - ONLINE_WINDOW - datetime.timedelta(minutes=1)
-    )
+def test_a_disconnected_colleague_reads_as_offline(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    UserFactory()
     _sign_in(client)
 
     row = gql_client.query(CONTACTS).data["chatContacts"][0]
@@ -345,15 +368,84 @@ def test_a_stale_heartbeat_reads_as_offline(gql_client: GraphQLTestClient, clien
     assert row["participant"]["online"] is False
 
 
-def test_heartbeat_records_presence_for_the_caller(
+def test_a_photo_only_message_needs_no_body(gql_client: GraphQLTestClient, client: Client) -> None:
+    _sign_in(client)
+    colleague = UserFactory()
+
+    result = gql_client.query(
+        SEND,
+        variables={"recipientId": str(colleague.pk), "photos": [_png_data_url()]},
+    )
+
+    sent = result.data["sendChatMessage"]
+    assert sent["body"] == ""
+    assert len(sent["attachments"]) == 1
+    assert sent["attachments"][0]["width"] == 300
+    assert sent["attachments"][0]["height"] == 200
+
+
+def test_a_message_can_carry_both_text_and_photos(
     gql_client: GraphQLTestClient, client: Client
 ) -> None:
+    _sign_in(client)
+    colleague = UserFactory()
+
+    result = gql_client.query(
+        SEND,
+        variables={
+            "body": "look at this",
+            "recipientId": str(colleague.pk),
+            "photos": [_png_data_url("red"), _png_data_url("green")],
+        },
+    )
+
+    sent = result.data["sendChatMessage"]
+    assert sent["body"] == "look at this"
+    assert len(sent["attachments"]) == 2
+
+
+def test_too_many_photos_on_one_message_is_rejected(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    _sign_in(client)
+    colleague = UserFactory()
+    photos = [_png_data_url() for _ in range(MAX_ATTACHMENTS_PER_MESSAGE + 1)]
+
+    result = gql_client.query(
+        SEND,
+        variables={"recipientId": str(colleague.pk), "photos": photos},
+        assert_no_errors=False,
+    )
+
+    assert result.errors
+    assert Message.objects.count() == 0
+
+
+def test_starting_a_call_without_graph_credentials_is_refused(
+    gql_client: GraphQLTestClient, client: Client
+) -> None:
+    # The test settings leave MS_GRAPH_* unset, so this should fail cleanly
+    # rather than attempt a real network call.
+    _sign_in(client)
+    colleague = UserFactory()
+
+    result = gql_client.query(
+        START_CALL,
+        variables={"recipientId": str(colleague.pk), "video": False},
+        assert_no_errors=False,
+    )
+
+    assert result.errors
+    assert "isn't set up" in result.errors[0]["message"]
+
+
+def test_you_cannot_call_yourself(gql_client: GraphQLTestClient, client: Client) -> None:
     me = _sign_in(client)
 
-    assert gql_client.query(HEARTBEAT).data["chatHeartbeat"] is True
-    assert Presence.objects.filter(user=me).exists()
+    result = gql_client.query(
+        START_CALL,
+        variables={"recipientId": str(me.pk), "video": True},
+        assert_no_errors=False,
+    )
 
-
-def test_anonymous_heartbeats_record_nothing(gql_client: GraphQLTestClient) -> None:
-    assert gql_client.query(HEARTBEAT).data["chatHeartbeat"] is False
-    assert Presence.objects.count() == 0
+    assert result.errors

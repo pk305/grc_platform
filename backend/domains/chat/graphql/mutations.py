@@ -2,11 +2,13 @@ import strawberry
 import strawberry_django
 from strawberry.types import Info
 
+from domains.chat import realtime
+from domains.chat.calls import CallsNotConfigured, create_online_meeting
 from domains.chat.service import (
     direct_conversation,
+    display_name,
     mark_read,
     send_message,
-    touch_presence,
     unread_total,
     visible_conversation,
 )
@@ -30,6 +32,11 @@ class ChatReadResult:
 
 
 @strawberry.type
+class ChatCallResult:
+    join_url: str
+
+
+@strawberry.type
 class ChatMutation:
     # These mutations report failure by raising, so the client gets a plain
     # GraphQL error rather than an OperationInfo union to unpack.
@@ -37,9 +44,10 @@ class ChatMutation:
     def send_chat_message(
         self,
         info: Info,
-        body: str,
+        body: str | None = None,
         conversation_id: strawberry.ID | None = None,
         recipient_id: strawberry.ID | None = None,
+        photos: list[str] | None = None,
     ) -> ChatMessageType:
         """Post a message, opening the thread with `recipient_id` if it's new.
 
@@ -64,7 +72,9 @@ class ChatMutation:
         else:
             raise ValueError("Specify a conversation or a recipient.")
 
-        message = send_message(user, body, conversation=conversation, recipient=recipient)
+        message = send_message(
+            user, body, conversation=conversation, recipient=recipient, photos=photos
+        )
         return to_message_types([message], user)[0]
 
     @strawberry_django.mutation(handle_django_errors=False)
@@ -99,14 +109,47 @@ class ChatMutation:
         return ChatReadResult(conversation_id=conversation_id, unread_total=unread_total(user))
 
     @strawberry_django.mutation(handle_django_errors=False)
-    def chat_heartbeat(self, info: Info) -> bool:
-        """Record that the caller is active, so colleagues see them online.
-
-        A mutation rather than a side effect of the contacts query: presence is
-        a write, and a query that quietly writes is a query nobody can cache.
-        """
+    def set_chat_typing(
+        self, info: Info, conversation_id: strawberry.ID, typing: bool
+    ) -> bool:
+        """Tell the other participant in `conversation_id` whether the caller
+        is currently typing. Nothing is stored — this only broadcasts."""
         user = info.context.request.user
         if not user.is_authenticated:
             return False
-        touch_presence(user)
+        conversation = visible_conversation(user, int(conversation_id))
+        if conversation is None:
+            raise ValueError("That conversation is not available.")
+        realtime.broadcast_typing(
+            conversation_id=conversation.pk, user_id=user.pk, typing=typing
+        )
         return True
+
+    @strawberry_django.mutation(handle_django_errors=False)
+    def start_chat_call(
+        self, info: Info, recipient_id: strawberry.ID, video: bool
+    ) -> ChatCallResult:
+        """Create a Teams meeting with `recipient_id` and return its join link.
+
+        Opens (or reuses) the direct thread the same way sending a message
+        does, so a call can be started before any message has been sent.
+        """
+        user = info.context.request.user
+        if not user.is_authenticated:
+            raise ValueError("Sign in to start a call.")
+        recipient = User.objects.filter(pk=int(recipient_id), is_active=True).first()
+        if recipient is None or recipient.pk == user.pk:
+            raise ValueError("That person is not available.")
+
+        direct_conversation(user, recipient)
+
+        kind = "Video" if video else "Voice"
+        subject = f"{kind} call: {display_name(user)} and {display_name(recipient)}"
+        try:
+            join_url = create_online_meeting(user.email, subject)
+        except CallsNotConfigured as exc:
+            raise ValueError(
+                "Calling isn't set up yet. Ask your admin to configure Microsoft Graph."
+            ) from exc
+
+        return ChatCallResult(join_url=join_url)

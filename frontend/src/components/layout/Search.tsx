@@ -26,7 +26,10 @@ export default function Search({
   // still plays instead of the whole thing being unmounted mid-flight.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
+      if (
+        event.key?.toLowerCase() === 'k' &&
+        (event.metaKey || event.ctrlKey)
+      ) {
         event.preventDefault();
         setOpen(true);
       }

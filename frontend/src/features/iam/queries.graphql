@@ -202,6 +202,20 @@ mutation IamAdminResetMfa($userId: ID!) {
   }
 }
 
+mutation IamAdminResetPassword($userId: ID!) {
+  adminResetPassword(userId: $userId) {
+    ... on UserType {
+      id
+    }
+    ... on OperationInfo {
+      messages {
+        field
+        message
+      }
+    }
+  }
+}
+
 mutation IamSetMfaRequired($userId: ID!, $required: Boolean!) {
   setMfaRequired(userId: $userId, required: $required) {
     ... on UserType {

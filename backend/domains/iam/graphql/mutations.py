@@ -439,6 +439,37 @@ class IamMutation:
     @strawberry_django.mutation(
         handle_django_errors=True, extensions=[require_roles(Role.Name.ADMIN)]
     )
+    def admin_reset_password(self, info: Info, user_id: strawberry.ID) -> UserType:
+        """Emails a password reset link — recovery path when a user is locked out."""
+        user = User.objects.get(pk=user_id)
+        if user.auth_provider == User.AuthProvider.ENTRA_ID:
+            raise DjangoValidationError(
+                "This account signs in through Microsoft Entra ID and has no local password "
+                "to reset."
+            )
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        reset_url = f"{settings.FRONTEND_URL}/auth/reset-password?uid={uid}&token={token}"
+        send_mail(
+            "Reset your password",
+            f"An administrator has requested a password reset for your account.\n\n"
+            f"Use the link below to set a new password:\n\n{reset_url}\n\n"
+            "If you weren't expecting this, contact your administrator.",
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+        )
+        IamAuditEvent.objects.create(
+            event_type=IamAuditEvent.EventType.PASSWORD_RESET_REQUESTED,
+            actor=_actor(info),
+            target_user=user,
+            detail=user.email,
+        )
+        return user  # type: ignore[return-value]
+
+    @strawberry_django.mutation(
+        handle_django_errors=True, extensions=[require_roles(Role.Name.ADMIN)]
+    )
     def set_mfa_required(self, info: Info, user_id: strawberry.ID, required: bool) -> UserType:
         user = User.objects.get(pk=user_id)
         user.mfa_required = required

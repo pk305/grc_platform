@@ -67,7 +67,8 @@ class Message(models.Model):
     sender = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="chat_messages"
     )
-    body = models.TextField()
+    # Blank when the message is photos only.
+    body = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -77,14 +78,32 @@ class Message(models.Model):
         return f"{self.sender}: {self.body[:40]}"
 
 
+class MessageAttachment(models.Model):
+    """One photo attached to a message. Stored inline, like `UserAvatar`."""
+
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="attachments")
+    image = models.BinaryField()
+    content_type = models.CharField(max_length=32)
+    width = models.PositiveIntegerField()
+    height = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"attachment {self.pk} on message {self.message_id}"
+
+
 class Presence(models.Model):
     """When someone was last seen with the app open.
 
-    Chat owns this rather than IAM: it exists only to decide whether a name in
-    the contacts rail gets a green dot, and the identity domain shouldn't grow
-    a column for a cosmetic detail of another domain. `last_seen_at` is
-    refreshed by the client's heartbeat, so "online" means recently active
-    rather than merely signed in.
+    Chat owns this rather than IAM: it exists only to support a "last seen"
+    caption in the rail, and the identity domain shouldn't grow a column for
+    a cosmetic detail of another domain. The green dot itself is *not* read
+    from here — "online" is connection-based, tracked live in Redis by
+    `realtime.py`. `last_seen_at` is written once, by `realtime.mark_disconnected`,
+    at the moment someone's last open chat socket closes.
     """
 
     user = models.OneToOneField(

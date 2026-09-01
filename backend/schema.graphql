@@ -12,6 +12,8 @@ type AccessSummary {
 
 union AdminResetMfaPayload = UserType | OperationInfo
 
+union AdminResetPasswordPayload = UserType | OperationInfo
+
 union AssignPermissionPayload = PermissionType | RoleError | OperationInfo
 
 input AssignRoleInput {
@@ -42,6 +44,17 @@ union BeginMfaSetupPayload = MfaSetupType | OperationInfo
 
 union ChangePasswordPayload = UserType | OperationInfo
 
+type ChatAttachmentType {
+  id: ID!
+  url: String!
+  width: Int!
+  height: Int!
+}
+
+type ChatCallResult {
+  joinUrl: String!
+}
+
 type ChatContactType {
   id: ID!
   participant: ChatParticipantType!
@@ -58,6 +71,7 @@ type ChatMessageType {
   createdAt: DateTime!
   sender: ChatParticipantType!
   mine: Boolean!
+  attachments: [ChatAttachmentType!]!
 }
 
 type ChatOpenResult {
@@ -75,9 +89,19 @@ type ChatParticipantType {
   lastSeenAt: DateTime
 }
 
+type ChatPresenceEvent {
+  userId: ID!
+  online: Boolean!
+}
+
 type ChatReadResult {
   conversationId: ID!
   unreadTotal: Int!
+}
+
+type ChatTypingEvent {
+  userId: ID!
+  typing: Boolean!
 }
 
 union ConfirmMfaSetupPayload = MfaConfirmedType | OperationInfo
@@ -258,6 +282,7 @@ type Mutation {
   updateMyAvatar(imageBase64: String!): UpdateMyAvatarPayload!
   removeMyAvatar: RemoveMyAvatarPayload!
   adminResetMfa(userId: ID!): AdminResetMfaPayload! @requireRoles
+  adminResetPassword(userId: ID!): AdminResetPasswordPayload! @requireRoles
   setMfaRequired(userId: ID!, required: Boolean!): SetMfaRequiredPayload! @requireRoles
   createUser(data: UserCreateInput!): CreateUserPayload! @requireRoles
   updateUser(userId: ID!, data: UserUpdateInput!): UpdateUserPayload! @requireRoles
@@ -271,10 +296,11 @@ type Mutation {
   createRisk(data: RiskCreateInput!): CreateRiskPayload! @requireRoles
   clearNotification(key: String!): [NotificationType!]!
   clearAllNotifications: [NotificationType!]!
-  sendChatMessage(body: String!, conversationId: ID = null, recipientId: ID = null): ChatMessageType!
+  sendChatMessage(body: String = null, conversationId: ID = null, recipientId: ID = null, photos: [String!] = null): ChatMessageType!
   openChatConversation(recipientId: ID!): ChatOpenResult!
   markChatRead(conversationId: ID!): ChatReadResult!
-  chatHeartbeat: Boolean!
+  setChatTyping(conversationId: ID!, typing: Boolean!): Boolean!
+  startChatCall(recipientId: ID!, video: Boolean!): ChatCallResult!
 }
 
 input MyProfileInput {
@@ -551,6 +577,13 @@ input StrFilterLookup {
   Case-insensitive regular expression match. Filter will be skipped on `null` value
   """
   iRegex: String
+}
+
+type Subscription {
+  chatMessageReceived(conversationId: ID!): ChatMessageType!
+  chatContactUpdated: ChatContactType!
+  chatTypingChanged(conversationId: ID!): ChatTypingEvent!
+  chatPresenceChanged: ChatPresenceEvent!
 }
 
 union UpdateMyAvatarPayload = UserType | OperationInfo

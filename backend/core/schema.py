@@ -7,6 +7,7 @@ from core.graphql.search import SearchQuery
 from domains.audit.graphql.queries import AuditQuery
 from domains.chat.graphql.mutations import ChatMutation
 from domains.chat.graphql.queries import ChatQuery
+from domains.chat.graphql.subscriptions import ChatSubscription
 from domains.controls.graphql.queries import ControlsQuery
 from domains.iam.graphql.mutations import IamMutation
 from domains.iam.graphql.queries import IamQuery
@@ -38,8 +39,14 @@ class Mutation(IamMutation, RiskMutation, NotificationsMutation, ChatMutation):
     pass
 
 
+@strawberry.type
+class Subscription(ChatSubscription):
+    pass
+
+
 schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,
+    subscription=Subscription,
     extensions=[DjangoOptimizerExtension],  # prevents N+1 by auto select/prefetch_related
 )

@@ -70,3 +70,50 @@ export async function toSquareDataUrl(file: File): Promise<string> {
 
   return canvas.toDataURL('image/jpeg', 0.9);
 }
+
+/** A photo scaled to fit within `maxEdge`, alongside its final pixel size. */
+export interface ContainedImage {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * Scales `file` so its longer edge is at most `maxEdge`, preserving aspect
+ * ratio, and returns it as a JPEG data URL. Unlike `toSquareDataUrl`, nothing
+ * is cropped — this is for content photos (e.g. a chat attachment), not an
+ * icon-sized avatar.
+ */
+export async function toContainedDataUrl(
+  file: File,
+  maxEdge: number
+): Promise<ContainedImage> {
+  if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+    throw new ImageReadError('Choose a JPEG, PNG or WebP image.');
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new ImageReadError('That image is too large. Choose one under 8 MB.');
+  }
+
+  const image = await loadImage(file);
+  const { naturalWidth, naturalHeight } = image;
+  if (naturalWidth === 0 || naturalHeight === 0) {
+    throw new ImageReadError('That image appears to be empty.');
+  }
+
+  const scale = Math.min(1, maxEdge / Math.max(naturalWidth, naturalHeight));
+  const width = Math.round(naturalWidth * scale);
+  const height = Math.round(naturalHeight * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new ImageReadError('Your browser could not process that image.');
+  }
+  context.drawImage(image, 0, 0, width, height);
+
+  return { dataUrl: canvas.toDataURL('image/jpeg', 0.9), width, height };
+}
