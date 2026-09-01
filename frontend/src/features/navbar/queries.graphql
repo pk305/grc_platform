@@ -1,0 +1,45 @@
+# Data behind the top navbar's controls: quick search, and the notification bell.
+
+query GlobalSearch($query: String!, $limit: Int) {
+  globalSearch(query: $query, limit: $limit) {
+    id
+    kind
+    label
+    sublabel
+    url
+  }
+}
+
+# Alerts are derived and worded server-side (domains/notifications/service.py);
+# the client only picks an icon per key and a colour per tone.
+query Notifications {
+  notifications {
+    key
+    tone
+    title
+    detail
+    href
+  }
+}
+
+# Both mutations return the alerts that remain, so the bell's badge and the
+# panel stay in step without a follow-up refetch.
+mutation ClearNotification($key: String!) {
+  clearNotification(key: $key) {
+    key
+    tone
+    title
+    detail
+    href
+  }
+}
+
+mutation ClearAllNotifications {
+  clearAllNotifications {
+    key
+    tone
+    title
+    detail
+    href
+  }
+}

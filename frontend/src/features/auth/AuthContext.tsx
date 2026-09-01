@@ -4,7 +4,8 @@ import { createContext, useContext, useCallback, type ReactNode } from 'react';
 import {
   useMeQuery,
   useLoginMutation,
-  useLogoutMutation
+  useLogoutMutation,
+  useVerifyMfaCodeMutation
 } from './__generated__/queries.generated';
 
 export interface AuthUser {
@@ -12,13 +13,18 @@ export interface AuthUser {
   email: string;
   firstName: string;
   lastName: string;
+  avatarUrl?: string | null;
   isSuperuser: boolean;
+  mustChangePassword: boolean;
+  mfaEnabled: boolean;
+  mfaRequired: boolean;
   roles: { id: string; name: string }[];
 }
 
 interface LoginResult {
   success: boolean;
   error?: string;
+  mfaRequired?: boolean;
 }
 
 interface AuthContextValue {
@@ -28,7 +34,9 @@ interface AuthContextValue {
   isAdmin: boolean;
   isSuperuser: boolean;
   login: (email: string, password: string) => Promise<LoginResult>;
+  verifyMfaCode: (code: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -39,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     errorPolicy: 'all'
   });
   const [loginMutation] = useLoginMutation();
+  const [verifyMfaCodeMutation] = useVerifyMfaCodeMutation();
   const [logoutMutation] = useLogoutMutation();
 
   const user: AuthUser | null = data?.me ?? null;
@@ -55,10 +64,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.__typename === 'AuthError') {
         return { success: false, error: result.message };
       }
+      if (result.__typename === 'MfaRequired') {
+        return { success: false, mfaRequired: true };
+      }
       await refetch();
       return { success: true };
     },
     [loginMutation, refetch]
+  );
+
+  const verifyMfaCode = useCallback(
+    async (code: string): Promise<LoginResult> => {
+      const { data: verifyData } = await verifyMfaCodeMutation({
+        variables: { code }
+      });
+      const result = verifyData?.verifyMfaCode;
+      if (!result) {
+        return { success: false, error: 'Unable to verify code.' };
+      }
+      if (result.__typename === 'AuthError') {
+        return { success: false, error: result.message };
+      }
+      if (result.__typename === 'MfaRequired') {
+        return { success: false, mfaRequired: true };
+      }
+      await refetch();
+      return { success: true };
+    },
+    [verifyMfaCodeMutation, refetch]
   );
 
   const logout = useCallback(async () => {
@@ -66,8 +99,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await client.clearStore();
   }, [logoutMutation, client]);
 
-  const isAdmin = user?.roles.some(role => role.name === 'admin') ?? false;
+  const refreshUser = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
   const isSuperuser = user?.isSuperuser ?? false;
+  const isAdmin =
+    isSuperuser || (user?.roles.some(role => role.name === 'admin') ?? false);
 
   return (
     <AuthContext.Provider
@@ -78,7 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         isSuperuser,
         login,
-        logout
+        verifyMfaCode,
+        logout,
+        refreshUser
       }}
     >
       {children}

@@ -12,6 +12,23 @@ export function roleLabel(name: string): string {
   return ROLE_LABEL[name] ?? name;
 }
 
+/**
+ * What each role is for, matching the grants seeded in
+ * backend/domains/iam/migrations/0005_seed_permissions.py.
+ */
+export const ROLE_DESCRIPTION: Record<string, string> = {
+  admin: 'Full identity administration — creates users, assigns roles',
+  ciso: 'Owns the ISMS — approves risks, controls and obligations',
+  risk_manager: 'Owns the risk register, assessments and incident records',
+  auditor: 'Records and approves audit findings; read-only elsewhere',
+  control_owner: 'Operates controls and raises incidents',
+  viewer: 'Read-only access across risk, controls, audit and obligations'
+};
+
+export function roleDescription(name: string): string {
+  return ROLE_DESCRIPTION[name] ?? '';
+}
+
 export const AUTH_PROVIDER_LABEL: Record<string, string> = {
   local: 'Local',
   entra_id: 'Microsoft Entra ID'
@@ -46,14 +63,34 @@ export function permissionActionLabel(action: string): string {
   return PERMISSION_ACTION_LABEL[action] ?? action;
 }
 
+/** Can administer identities or role assignment — a privileged grant. */
+export function isPrivilegedGrant(permission: {
+  resource: string;
+  action: string;
+}): boolean {
+  return (
+    (permission.resource === 'iam_users' ||
+      permission.resource === 'iam_roles') &&
+    permission.action !== 'view'
+  );
+}
+
 /** IamAuditEvent.EventType labels + badge color, for the Overview and Audit Log pages. */
 export const AUDIT_EVENT_LABEL: Record<string, string> = {
   'user.created': 'User created',
+  'user.updated': 'User updated',
   'user.activated': 'User activated',
   'user.deactivated': 'User deactivated',
   'user.deleted': 'User deleted',
   'role.granted': 'Role granted',
   'role.revoked': 'Role revoked',
+  'permission.granted': 'Permission granted',
+  'permission.revoked': 'Permission revoked',
+  'mfa.enabled': 'MFA enabled',
+  'mfa.disabled': 'MFA disabled',
+  'mfa.reset': 'MFA reset by admin',
+  'mfa.codes_regenerated': 'Recovery codes regenerated',
+  'profile.updated': 'Profile updated',
   'sso.sign_in': 'Sign-in',
   'login.failed': 'Sign-in failed'
 };
@@ -63,11 +100,19 @@ export const AUDIT_EVENT_COLOR: Record<
   'green' | 'red' | 'blue' | 'gray' | 'amber'
 > = {
   'user.created': 'green',
+  'user.updated': 'blue',
   'user.activated': 'green',
   'user.deactivated': 'red',
   'user.deleted': 'red',
   'role.granted': 'green',
   'role.revoked': 'red',
+  'permission.granted': 'green',
+  'permission.revoked': 'red',
+  'mfa.enabled': 'green',
+  'mfa.disabled': 'red',
+  'mfa.reset': 'amber',
+  'mfa.codes_regenerated': 'blue',
+  'profile.updated': 'blue',
   'sso.sign_in': 'blue',
   'login.failed': 'amber'
 };

@@ -5,6 +5,7 @@ export default function Avatar({
   size = '2xl',
   round = 'circle',
   img = 'team/avatar-placeholder.png',
+  src,
   contentClass = '',
   name,
   more,
@@ -18,6 +19,8 @@ export default function Avatar({
   size?: string;
   round?: string;
   img?: string | string[];
+  /** Absolute or data URL for an uploaded image; takes precedence over `name` and `img`. */
+  src?: string | null;
   contentClass?: string;
   name?: string;
   more?: ReactNode;
@@ -32,6 +35,15 @@ export default function Avatar({
     `avatar ${status ? `avatar-${size} status-${status}` : `avatar-${size}`} ${
       bordered ? 'avatar-bordered' : ''
     } ${className || ''}`.trim();
+
+  if (src) {
+    return (
+      <div className={wrapperClass}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className={`rounded-${round}`} src={src} alt="" />
+      </div>
+    );
+  }
 
   if (name) {
     return (

@@ -4,7 +4,7 @@ import { getServerAuthUser } from '@/features/auth/getServerAuthUser';
 import LoginForm from './LoginForm';
 
 export const metadata: Metadata = {
-  title: 'Sign in · Phoenix'
+  title: 'Sign In'
 };
 
 export default async function LoginPage() {

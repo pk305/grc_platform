@@ -1,5 +1,7 @@
 """Settings shared by every environment."""
 
+import base64
+import hashlib
 from pathlib import Path
 
 import environ
@@ -16,6 +18,15 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+
+# Fernet key encrypting MFA (TOTP) secrets at rest. Falls back to a key
+# derived from SECRET_KEY for convenience — production deployments should
+# set an explicit MFA_ENCRYPTION_KEY so rotating SECRET_KEY doesn't also
+# invalidate every enrolled user's MFA secret.
+MFA_ENCRYPTION_KEY = env(
+    "MFA_ENCRYPTION_KEY",
+    default=base64.urlsafe_b64encode(hashlib.sha256(SECRET_KEY.encode()).digest()),
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -34,6 +45,8 @@ INSTALLED_APPS = [
     "domains.audit",
     "domains.incidents",
     "domains.obligations",
+    "domains.notifications",
+    "domains.chat",
 ]
 
 MIDDLEWARE = [

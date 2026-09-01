@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Box, Flex } from '@radix-ui/themes';
 import { Skeleton } from '@/components/ui';
 import { useAuth } from './AuthContext';
+import ForcePasswordChangeDialog from './ForcePasswordChangeDialog';
+import MfaSetupScreen from './MfaSetupScreen';
 
 function AppShellSkeleton() {
   return (
@@ -49,7 +51,7 @@ function AppShellSkeleton() {
 }
 
 export default function AuthGuard({ children }: { children: ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -60,6 +62,14 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
 
   if (loading || !isAuthenticated) {
     return <AppShellSkeleton />;
+  }
+
+  if (user?.mustChangePassword) {
+    return <ForcePasswordChangeDialog />;
+  }
+
+  if (user?.mfaRequired && !user?.mfaEnabled) {
+    return <MfaSetupScreen />;
   }
 
   return <>{children}</>;

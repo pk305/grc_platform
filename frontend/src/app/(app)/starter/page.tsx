@@ -1,5 +1,10 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Box } from '@radix-ui/themes';
+
+export const metadata: Metadata = {
+  title: 'Starter'
+};
 
 export default function StarterPage() {
   return (

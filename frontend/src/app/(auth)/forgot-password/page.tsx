@@ -1,10 +1,12 @@
 'use client';
 
 import AuthShell from '@/components/auth/AuthShell';
+import { PageTitle } from '@/components/common/PageTitle';
 
 export default function ForgotPasswordPage() {
   return (
     <AuthShell columnClass="col-xxl-4">
+      <PageTitle title="Forgot Password" />
       <div className="text-center mb-6">
         <h4 className="text-800">Forgot your password?</h4>
         <p className="text-700 mb-5">

@@ -10,6 +10,10 @@ type AccessSummary {
   signInFailures24h: Int!
 }
 
+union AdminResetMfaPayload = UserType | OperationInfo
+
+union AssignPermissionPayload = PermissionType | RoleError | OperationInfo
+
 input AssignRoleInput {
   userId: ID!
   roleName: String!
@@ -34,6 +38,50 @@ type AuthError {
   message: String!
 }
 
+union BeginMfaSetupPayload = MfaSetupType | OperationInfo
+
+union ChangePasswordPayload = UserType | OperationInfo
+
+type ChatContactType {
+  id: ID!
+  participant: ChatParticipantType!
+  conversationId: ID
+  unreadCount: Int!
+  lastMessagePreview: String!
+  lastMessageAt: DateTime
+}
+
+type ChatMessageType {
+  id: ID!
+  conversationId: ID!
+  body: String!
+  createdAt: DateTime!
+  sender: ChatParticipantType!
+  mine: Boolean!
+}
+
+type ChatOpenResult {
+  conversationId: ID!
+  unreadTotal: Int!
+}
+
+type ChatParticipantType {
+  id: ID!
+  name: String!
+  email: String!
+  department: String!
+  avatarUrl: String
+  online: Boolean!
+  lastSeenAt: DateTime
+}
+
+type ChatReadResult {
+  conversationId: ID!
+  unreadTotal: Int!
+}
+
+union ConfirmMfaSetupPayload = MfaConfirmedType | OperationInfo
+
 union CreateRiskPayload = RiskType | OperationInfo
 
 union CreateUserPayload = UserType | OperationInfo
@@ -45,6 +93,8 @@ scalar Date
 scalar DateTime
 
 union DeleteUserPayload = UserType | OperationInfo
+
+union DisableMfaPayload = UserType | OperationInfo
 
 """permission | action"""
 enum IamPermissionActionEnum {
@@ -173,20 +223,72 @@ type IncidentSummary {
   openCount: Int!
 }
 
-union LoginResult = UserType | AuthError
+union LoginResult = UserType | AuthError | MfaRequired
+
+type MfaConfirmedType {
+  user: UserType!
+  recoveryCodes: [String!]!
+}
+
+type MfaRecoveryCodesType {
+  recoveryCodes: [String!]!
+}
+
+type MfaRequired {
+  message: String!
+}
+
+type MfaSetupType {
+  secret: String!
+  provisioningUri: String!
+}
 
 type Mutation {
   login(email: String!, password: String!): LoginResult!
+  verifyMfaCode(code: String!): LoginResult!
   logout: Boolean!
   requestPasswordReset(email: String!): Boolean!
   resetPassword(uid: String!, token: String!, newPassword: String!): ResetPasswordPayload!
+  changePassword(oldPassword: String!, newPassword: String!): ChangePasswordPayload!
+  beginMfaSetup: BeginMfaSetupPayload!
+  confirmMfaSetup(code: String!): ConfirmMfaSetupPayload!
+  disableMfa(password: String!): DisableMfaPayload!
+  regenerateMfaRecoveryCodes(password: String!): RegenerateMfaRecoveryCodesPayload!
+  updateMyProfile(data: MyProfileInput!): UpdateMyProfilePayload!
+  updateMyAvatar(imageBase64: String!): UpdateMyAvatarPayload!
+  removeMyAvatar: RemoveMyAvatarPayload!
+  adminResetMfa(userId: ID!): AdminResetMfaPayload! @requireRoles
+  setMfaRequired(userId: ID!, required: Boolean!): SetMfaRequiredPayload! @requireRoles
   createUser(data: UserCreateInput!): CreateUserPayload! @requireRoles
+  updateUser(userId: ID!, data: UserUpdateInput!): UpdateUserPayload! @requireRoles
   setUserActive(userId: ID!, isActive: Boolean!): SetUserActivePayload! @requireRoles
   deleteUser(userId: ID!): DeleteUserPayload! @requireRoles
   assignRole(data: AssignRoleInput!): AssignRolePayload! @requireRoles
   startAccessReview(userIds: [ID!]!): [UserType!]! @requireRoles
   revokeRole(data: AssignRoleInput!): RevokeRolePayload! @requireRoles
+  assignPermission(data: RolePermissionInput!): AssignPermissionPayload! @requireRoles
+  revokePermission(data: RolePermissionInput!): RevokePermissionPayload! @requireRoles
   createRisk(data: RiskCreateInput!): CreateRiskPayload! @requireRoles
+  clearNotification(key: String!): [NotificationType!]!
+  clearAllNotifications: [NotificationType!]!
+  sendChatMessage(body: String!, conversationId: ID = null, recipientId: ID = null): ChatMessageType!
+  openChatConversation(recipientId: ID!): ChatOpenResult!
+  markChatRead(conversationId: ID!): ChatReadResult!
+  chatHeartbeat: Boolean!
+}
+
+input MyProfileInput {
+  firstName: String! = ""
+  lastName: String! = ""
+  department: String! = ""
+}
+
+type NotificationType {
+  key: String!
+  tone: String!
+  title: String!
+  detail: String!
+  href: String!
 }
 
 type ObligationSummary {
@@ -258,7 +360,9 @@ type Query {
   roles(filters: RoleFilter, order: RoleOrder): [RoleType!]!
   permissions(order: PermissionOrder): [PermissionType!]!
   me: UserType
+  usernameAvailable(username: String!): Boolean! @requireRoles
   auditEvents(limit: Int! = 50): [AuditEventType!]!
+  myAuditEvents(limit: Int! = 25): [AuditEventType!]!
   accessSummary: AccessSummary!
   risks(order: RiskOrder): [RiskType!]!
   riskSummary: RiskSummary!
@@ -266,9 +370,20 @@ type Query {
   auditSummary: AuditSummary!
   incidentSummary: IncidentSummary!
   obligationSummary: ObligationSummary!
+  notifications: [NotificationType!]!
+  chatContacts(search: String = null, limit: Int = null): [ChatContactType!]!
+  chatMessages(conversationId: ID!, limit: Int = null): [ChatMessageType!]!
+  chatUnreadTotal: Int!
+  globalSearch(query: String!, limit: Int! = 5): [SearchResult!]!
 }
 
+union RegenerateMfaRecoveryCodesPayload = MfaRecoveryCodesType | OperationInfo
+
+union RemoveMyAvatarPayload = UserType | OperationInfo
+
 union ResetPasswordPayload = UserType | OperationInfo
+
+union RevokePermissionPayload = PermissionType | RoleError | OperationInfo
 
 union RevokeRolePayload = UserType | RoleError | OperationInfo
 
@@ -362,11 +477,26 @@ input RoleOrder @oneOf {
   name: Ordering
 }
 
+input RolePermissionInput {
+  roleName: String!
+  permissionId: ID!
+}
+
 """Role(id, name)"""
 type RoleType {
   id: ID!
   name: IamRoleNameEnum!
 }
+
+type SearchResult {
+  id: String!
+  kind: String!
+  label: String!
+  sublabel: String!
+  url: String!
+}
+
+union SetMfaRequiredPayload = UserType | OperationInfo
 
 union SetUserActivePayload = UserType | OperationInfo
 
@@ -423,12 +553,22 @@ input StrFilterLookup {
   iRegex: String
 }
 
+union UpdateMyAvatarPayload = UserType | OperationInfo
+
+union UpdateMyProfilePayload = UserType | OperationInfo
+
+union UpdateUserPayload = UserType | OperationInfo
+
 input UserCreateInput {
   email: String!
   username: String!
   password: String!
+  roleName: String!
   firstName: String! = ""
   lastName: String! = ""
+  department: String! = ""
+  requireMfa: Boolean! = false
+  sendWelcomeEmail: Boolean! = false
 }
 
 """Application user. Email is the login identifier."""
@@ -472,5 +612,17 @@ type UserType {
   entraObjectId: String
   department: String!
   mfaEnabled: Boolean!
+  mfaRequired: Boolean!
   nextAccessReviewDate: Date
+  mustChangePassword: Boolean!
+  mfaRecoveryCodesRemaining: Int!
+  avatarUrl: String
+}
+
+input UserUpdateInput {
+  email: String!
+  username: String!
+  firstName: String! = ""
+  lastName: String! = ""
+  department: String! = ""
 }

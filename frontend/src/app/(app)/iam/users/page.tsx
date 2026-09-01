@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Badge, Box, Flex, Grid, Heading, Text } from '@radix-ui/themes';
 import { DataGrid } from '@/components/data-grid/DataGrid';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -19,7 +20,9 @@ import {
 } from '@/lib/iam-roles';
 import { PageTitle } from '@/components/common/PageTitle';
 import { NewUserDialog } from './NewUserDialog';
+import { EditUserDialog } from './EditUserDialog';
 import { ManageUserDialog } from './ManageUserDialog';
+import { DeleteUserButton } from './DeleteUserButton';
 import { UsersBulkActionsBar } from './UsersBulkActionsBar';
 
 type UserRow = IamUsersQuery['users'][number];
@@ -45,6 +48,10 @@ export default function UsersPage() {
   const roles = rolesData?.roles ?? EMPTY_ROLES;
   const summary = summaryData?.accessSummary;
   const [filter, setFilter] = useState<UserFilter>('all');
+  // Quick search in the navbar links here as ?q=<email>, so the person it
+  // matched is already filtered in when the page opens.
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get('q') ?? undefined;
 
   const activeCount =
     summary?.activeUsersCount ?? users.filter(u => u.isActive).length;
@@ -151,10 +158,14 @@ export default function UsersPage() {
     }),
     columnHelper.accessor('mfaEnabled', {
       header: 'MFA',
-      cell: ({ getValue }) =>
+      cell: ({ getValue, row }) =>
         getValue() ? (
           <Badge color="green" variant="soft">
             Enabled
+          </Badge>
+        ) : row.original.mfaRequired ? (
+          <Badge color="red" variant="soft">
+            Required
           </Badge>
         ) : (
           <Badge color="gray" variant="soft">
@@ -202,12 +213,25 @@ export default function UsersPage() {
             id: 'actions',
             header: '',
             cell: ({ row }) => (
-              <ManageUserDialog
-                user={row.original}
-                roles={roles}
-                currentUserId={currentUser?.id ?? null}
-                onChanged={() => refetch()}
-              />
+              <Flex gap="2" justify="end">
+                <EditUserDialog
+                  user={row.original}
+                  onChanged={() => refetch()}
+                />
+                <ManageUserDialog
+                  user={row.original}
+                  roles={roles}
+                  currentUserId={currentUser?.id ?? null}
+                  onChanged={() => refetch()}
+                />
+                {isSuperuser && (
+                  <DeleteUserButton
+                    user={row.original}
+                    currentUserId={currentUser?.id ?? null}
+                    onChanged={() => refetch()}
+                  />
+                )}
+              </Flex>
             )
           })
         ]
@@ -227,7 +251,9 @@ export default function UsersPage() {
               Identity lifecycle — accounts, activation, and role assignment.
             </Text>
           </Box>
-          {isAdmin && <NewUserDialog onCreated={() => refetch()} />}
+          {isAdmin && (
+            <NewUserDialog roles={roles} onCreated={() => refetch()} />
+          )}
         </Flex>
 
         <Grid columns={{ initial: '2', md: '3', xl: '6' }} gap="3">
@@ -284,6 +310,7 @@ export default function UsersPage() {
 
         <DataGrid
           title="User Accounts"
+          initialGlobalFilter={initialSearch}
           data={filteredUsers}
           columns={columns}
           enableRowSelection={isAdmin}

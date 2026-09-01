@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Badge,
   Box,
@@ -156,7 +157,10 @@ export default function RiskRegisterPage() {
   const risks = data?.risks ?? EMPTY_RISKS;
   const owners = ownersData?.users ?? EMPTY_OWNERS;
 
-  const [search, setSearch] = useState('');
+  // Quick search in the navbar links here as ?q=<reference>, so the row it
+  // matched is already filtered in when the page opens.
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [level, setLevel] = useState('');
   const [status, setStatus] = useState('');
   const [overdueOnly, setOverdueOnly] = useState(false);

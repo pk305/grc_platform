@@ -1,0 +1,81 @@
+# Data behind the chat rail and the docked conversation windows.
+#
+# The rail polls `ChatContacts`, which carries everything one row needs —
+# presence, unread count and preview — so a list of colleagues costs one
+# request rather than one per person.
+
+fragment ChatParticipantFields on ChatParticipantType {
+  id
+  name
+  email
+  department
+  avatarUrl
+  online
+  lastSeenAt
+}
+
+fragment ChatMessageFields on ChatMessageType {
+  id
+  conversationId
+  body
+  createdAt
+  mine
+  sender {
+    ...ChatParticipantFields
+  }
+}
+
+query ChatContacts($search: String, $limit: Int) {
+  chatContacts(search: $search, limit: $limit) {
+    id
+    conversationId
+    unreadCount
+    lastMessagePreview
+    lastMessageAt
+    participant {
+      ...ChatParticipantFields
+    }
+  }
+}
+
+query ChatMessages($conversationId: ID!, $limit: Int) {
+  chatMessages(conversationId: $conversationId, limit: $limit) {
+    ...ChatMessageFields
+  }
+}
+
+# Sending accepts a recipient instead of a thread id, so a window opened from
+# the rail can send its first message before any thread exists.
+mutation SendChatMessage(
+  $body: String!
+  $conversationId: ID
+  $recipientId: ID
+) {
+  sendChatMessage(
+    body: $body
+    conversationId: $conversationId
+    recipientId: $recipientId
+  ) {
+    ...ChatMessageFields
+  }
+}
+
+# Opening a window both resolves the thread and clears its unread badge. The
+# badge itself is summed from the contacts the rail already polls, so the
+# server's `unreadTotal` is left unselected rather than kept in step by hand.
+mutation OpenChatConversation($recipientId: ID!) {
+  openChatConversation(recipientId: $recipientId) {
+    conversationId
+  }
+}
+
+mutation MarkChatRead($conversationId: ID!) {
+  markChatRead(conversationId: $conversationId) {
+    conversationId
+  }
+}
+
+# Keeps the caller's status dot green for colleagues while a tab is open.
+mutation ChatHeartbeat {
+  chatHeartbeat
+}
