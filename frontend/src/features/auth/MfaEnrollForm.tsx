@@ -14,21 +14,12 @@ function formatSecret(secret: string): string {
 }
 
 export interface MfaEnrollFormProps {
-  /** TOTP secret from `beginMfaSetup`, shown for manual entry. */
   secret: string;
-  /** otpauth:// URI from `beginMfaSetup`, rendered as the QR code. */
   provisioningUri: string;
-  /** Called with the one-time recovery codes once the code verifies. */
   onEnrolled: (recoveryCodes: string[]) => void;
-  /** Prefix for the field id, so two forms can coexist on a page. */
   idPrefix?: string;
 }
 
-/**
- * TOTP enrollment: QR code, manual key, and the confirmation code field.
- * Shared by the forced-enrollment screen and self-service setup on the
- * profile page so both drive the same verified flow (A.8.5).
- */
 export function MfaEnrollForm({
   secret,
   provisioningUri,

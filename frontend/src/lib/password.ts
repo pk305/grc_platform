@@ -15,7 +15,6 @@ function randomChar(pool: string): string {
   return pool[randomIndex(pool.length)];
 }
 
-/** A random password satisfying the backend's Django password validators. */
 export function generateTemporaryPassword(): string {
   const chars = [
     randomChar(LOWER),
@@ -35,8 +34,6 @@ export function generateTemporaryPassword(): string {
 
 export const MIN_PASSWORD_LENGTH = 12;
 
-// Best-effort UX hint only — the server's CommonPasswordValidator is the
-// actual security boundary. Kept short on purpose.
 const COMMON_PASSWORDS = new Set([
   'password',
   'password1',

@@ -60,7 +60,7 @@ function ToastView({
   return (
     <div
       ref={ref}
-      className="toast mb-2 bg-white border shadow-sm"
+      className="toast mb-2 bg-surface border shadow-sm"
       role="alert"
       aria-live="assertive"
       aria-atomic="true"

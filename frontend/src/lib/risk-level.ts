@@ -1,7 +1,3 @@
-/**
- * Risk criteria (ISO 31000 §6.3.4) — likelihood × impact, both 1-5.
- * Must stay in lockstep with backend/domains/risk/scoring.py.
- */
 export function levelForScore(likelihood: number, impact: number): string {
   const score = likelihood * impact;
   if (score >= 16) return 'critical';

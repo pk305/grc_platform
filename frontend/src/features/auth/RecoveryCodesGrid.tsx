@@ -3,11 +3,6 @@
 import { useState } from 'react';
 import { Button, Flex, Text } from '@radix-ui/themes';
 
-/**
- * The one-time MFA recovery codes, shown immediately after they are issued.
- * They are hashed server-side and can never be retrieved again (A.8.5), so
- * this is the only opportunity to copy them.
- */
 export function RecoveryCodesGrid({ codes }: { codes: string[] }) {
   const [copied, setCopied] = useState(false);
 
@@ -17,7 +12,6 @@ export function RecoveryCodesGrid({ codes }: { codes: string[] }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard access can be blocked — the codes stay readable on screen.
       setCopied(false);
     }
   }

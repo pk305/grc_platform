@@ -50,6 +50,15 @@
       0.96
     )};
 
+  // Falcon's own map.get($theme-colors-soft/.text-*) utilities never had a
+  // dark counterpart, so .navbar-top's `navbar-light` variant kept flipping
+  // its text near-white here while this stayed the light-mode $white — white
+  // text on a white bar. navbar-vertical-border-color is the sidebar's own
+  // right-edge seam (and the divider under the top navbar's logo well) —
+  // same story, stuck at the light gray from root/_light.scss.
+  --#{$variable-prefix}navbar-top-bg-color: #{map.get($dark-grays, '200')};
+  --#{$variable-prefix}navbar-vertical-border-color: #{rgba($white, 0.08)};
+
   --#{$variable-prefix}navbar-dark-color: #{rgba($dark, 0.55)};
   --#{$variable-prefix}navbar-dark-hover-color: #{rgba($dark, 0.75)};
   --#{$variable-prefix}navbar-dark-active-color: #{$dark};
@@ -511,4 +520,75 @@
   /* ------------------------------- Custom disabled button ------------------------------ */
   --#{$variable-prefix}btn-disabled-custom-background: #{rgba($dark, 0.65)};
   --#{$variable-prefix}btn-disabled-custom-color: #{rgba($white, 0.2)};
+
+  /* ------------------------------ Component overrides ----------------------------- */
+  // Bootstrap 5.3's own component CSS (~bootstrap/scss/_dropdown.scss,
+  // _card.scss, ...) re-declares --phoenix-dropdown-bg / --phoenix-card-bg
+  // *locally on .dropdown-menu / .card themselves*, baked from the light-mode
+  // $dropdown-bg / $card-bg Sass constants. A value set directly on an
+  // element always wins over one merely inherited from `.dark` on <html>, so
+  // the vars above never reach these two — they need their own override that
+  // also targets the component selector, e.g. the top navbar's notification,
+  // settings and profile dropdowns (all `.dropdown-menu > .card`).
+  .dropdown-menu {
+    --#{$variable-prefix}dropdown-bg: #{map.get($dark-grays, '200')};
+    --#{$variable-prefix}dropdown-color: #{map.get($dark-grays, '800')};
+  }
+  .card {
+    --#{$variable-prefix}card-bg: #{map.get($dark-grays, '200')};
+  }
+
+  // Same story again: Bootstrap's outline-button mixin bakes --phoenix-btn-*
+  // onto .btn-outline-secondary from the light-mode $secondary Sass constant
+  // (#{$secondary}, i.e. near-black). Solid .btn-secondary is unaffected —
+  // white text over a dark fill reads fine in either theme — but an outline
+  // button uses that color AS the text/border, which goes near-invisible on
+  // a dark panel (e.g. the settings dropdown's Light/Dark/System toggle).
+  .btn-outline-secondary {
+    --#{$variable-prefix}btn-color: #{map.get($dark-grays, '700')};
+    --#{$variable-prefix}btn-border-color: #{map.get($dark-grays, '700')};
+    --#{$variable-prefix}btn-hover-color: #{map.get($dark-grays, '100')};
+    --#{$variable-prefix}btn-hover-bg: #{map.get($dark-grays, '700')};
+    --#{$variable-prefix}btn-hover-border-color: #{map.get($dark-grays, '800')};
+    --#{$variable-prefix}btn-focus-shadow-rgb: #{color.red(
+        map.get($dark-grays, '700')
+      )},
+      #{color.green(map.get($dark-grays, '700'))},
+      #{color.blue(map.get($dark-grays, '700'))};
+    --#{$variable-prefix}btn-active-color: #{map.get($dark-grays, '100')};
+    --#{$variable-prefix}btn-active-bg: #{map.get($dark-grays, '700')};
+    --#{$variable-prefix}btn-active-border-color: #{map.get(
+        $dark-grays,
+        '800'
+      )};
+    --#{$variable-prefix}btn-disabled-color: #{map.get($dark-grays, '600')};
+    --#{$variable-prefix}btn-disabled-border-color: #{map.get(
+        $dark-grays,
+        '600'
+      )};
+  }
+
+  // Falcon's numbered-gray utilities (.text-900, .bg-300, .border-400, ...)
+  // are the app's most-used way of coloring copy/surfaces/dividers — over a
+  // hundred call sites across dashboard cards, page headers, forms, showcase
+  // components. `_utilities.scss`'s `text`/`background-color`/`border-color`
+  // entries all build from $theme-all-colors, a Sass map baked once at
+  // compile time, so every one of those classes is `!important` and pinned
+  // to its light-mode value. --#{$variable-prefix}#{$key} already flips
+  // correctly per theme (root/_light.scss and $dark-grays above both feed
+  // the same loop), so re-pointing the classes at it is enough — no new
+  // colors to invent here.
+  @each $key in '100', '200', '300', '400', '500', '600', '700', '800', '900',
+    '1000'
+  {
+    .text-#{$key} {
+      color: var(--#{$variable-prefix}#{$key}) !important;
+    }
+    .bg-#{$key} {
+      background-color: var(--#{$variable-prefix}#{$key}) !important;
+    }
+    .border-#{$key} {
+      border-color: var(--#{$variable-prefix}#{$key}) !important;
+    }
+  }
 }

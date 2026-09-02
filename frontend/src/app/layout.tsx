@@ -53,16 +53,11 @@ export const viewport = {
   ]
 };
 
-/**
- * Applies the stored theme before first paint, so a dark-mode user never gets
- * a white flash while React hydrates. Deliberately dependency-free and inline:
- * anything loaded over the network would be too late to matter.
- */
 const NO_FLASH_SCRIPT = `
 (function () {
   try {
     var stored = localStorage.getItem('${THEME_STORAGE_KEY}');
-    var dark = stored === 'dark' || ((!stored || stored === 'system') &&
+    var dark = stored === 'dark' || (stored === 'system' &&
       window.matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.classList.toggle('dark', dark);
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';

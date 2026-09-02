@@ -1,4 +1,3 @@
-/** Role names (backend/domains/iam/models.py Role.Name) shown in the IAM UI. */
 export const ROLE_LABEL: Record<string, string> = {
   admin: 'Admin',
   ciso: 'CISO',
@@ -12,10 +11,6 @@ export function roleLabel(name: string): string {
   return ROLE_LABEL[name] ?? name;
 }
 
-/**
- * What each role is for, matching the grants seeded in
- * backend/domains/iam/migrations/0005_seed_permissions.py.
- */
 export const ROLE_DESCRIPTION: Record<string, string> = {
   admin: 'Full identity administration — creates users, assigns roles',
   ciso: 'Owns the ISMS — approves risks, controls and obligations',
@@ -34,7 +29,6 @@ export const AUTH_PROVIDER_LABEL: Record<string, string> = {
   entra_id: 'Microsoft Entra ID'
 };
 
-/** Permission resources (backend/domains/iam/models.py Permission.Resource). */
 export const PERMISSION_RESOURCE_LABEL: Record<string, string> = {
   iam_users: 'Users',
   iam_roles: 'Roles',
@@ -49,7 +43,6 @@ export function permissionResourceLabel(resource: string): string {
   return PERMISSION_RESOURCE_LABEL[resource] ?? resource;
 }
 
-/** Permission actions (backend/domains/iam/models.py Permission.Action). */
 export const PERMISSION_ACTION_LABEL: Record<string, string> = {
   view: 'View',
   create: 'Create',
@@ -63,7 +56,6 @@ export function permissionActionLabel(action: string): string {
   return PERMISSION_ACTION_LABEL[action] ?? action;
 }
 
-/** Can administer identities or role assignment — a privileged grant. */
 export function isPrivilegedGrant(permission: {
   resource: string;
   action: string;
@@ -75,7 +67,6 @@ export function isPrivilegedGrant(permission: {
   );
 }
 
-/** IamAuditEvent.EventType labels + badge color, for the Overview and Audit Log pages. */
 export const AUDIT_EVENT_LABEL: Record<string, string> = {
   'user.created': 'User created',
   'user.updated': 'User updated',
@@ -121,7 +112,6 @@ export function auditEventLabel(eventType: string): string {
   return AUDIT_EVENT_LABEL[eventType] ?? eventType;
 }
 
-/** Access-review status derived from User.nextAccessReviewDate, for the Users grid. */
 export function accessReviewStatus(nextReviewDate: string | null | undefined): {
   label: string;
   color: 'green' | 'red' | 'blue' | 'gray' | 'amber';

@@ -7,10 +7,6 @@ const togglePaginationButtonDisable = (button, disabled) => {
   button.classList[disabled ? 'add' : 'remove']('disabled');
 };
 
-/**
- * Ported from src/scripts/theme/list.js's `listInit`, scoped to one
- * container ref instead of scanning the whole document for `[data-list]`.
- */
 export default function useDataList(containerRef, options) {
   useEffect(() => {
     const el = containerRef.current;

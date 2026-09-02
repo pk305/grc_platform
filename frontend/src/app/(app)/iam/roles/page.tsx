@@ -53,7 +53,6 @@ type RoleFilter = 'all' | 'privileged' | 'unused' | 'review';
 interface RoleStats {
   members: UserRow[];
   permissions: PermissionRow[];
-  /** Can administer identities or role assignment (A.8.2 privileged access). */
   privileged: boolean;
   overdueReviews: number;
   dueSoonReviews: number;

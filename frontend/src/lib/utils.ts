@@ -24,6 +24,7 @@ export const getData = (el, data) => {
 
 export const hexToRgb = hexValue => {
   let hex;
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   hexValue.indexOf('#') === 0
     ? (hex = hexValue.substring(1))
     : (hex = hexValue);
@@ -49,6 +50,7 @@ export const getColor = (name, dom = document.documentElement) =>
   getComputedStyle(dom).getPropertyValue(`--phoenix-${name}`).trim();
 
 export const hasClass = (el, className) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   !el && false;
   return el.classList.value.includes(className);
 };
@@ -153,7 +155,7 @@ export const getDates = (
 };
 
 export const getPastDates = duration => {
-  let days;
+  let days: number;
 
   switch (duration) {
     case 'week':

@@ -48,8 +48,6 @@ export default function UsersPage() {
   const roles = rolesData?.roles ?? EMPTY_ROLES;
   const summary = summaryData?.accessSummary;
   const [filter, setFilter] = useState<UserFilter>('all');
-  // Quick search in the navbar links here as ?q=<email>, so the person it
-  // matched is already filtered in when the page opens.
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get('q') ?? undefined;
 

@@ -12,7 +12,7 @@
 
   .search-box-icon {
     position: absolute;
-    color: $gray-500;
+    color: var(--qs-faint, #{$gray-500});
     top: 50%;
     left: 1rem;
     transform: translateY(-48%);

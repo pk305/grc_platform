@@ -5,12 +5,10 @@ import { useGlobalSearchQuery } from '@/features/navbar/__generated__/queries.ge
 import { flattenSitemap } from '@/lib/sitemap';
 import { cleanText } from '@/lib/text';
 
-/** Matches the backend's MIN_SEARCH_TERM_LENGTH — below this nothing is queried. */
 export const MIN_TERM_LENGTH = 2;
 
 const DEBOUNCE_MS = 200;
 const MAX_PAGE_RESULTS = 4;
-/** Pages offered as a starting point before anything has been typed. */
 const MAX_SUGGESTIONS = 6;
 
 export type QuickSearchKind = 'page' | 'risk' | 'user';
@@ -64,24 +62,14 @@ function matchPages(term: string): QuickSearchItem[] {
     .map(toPageItem);
 }
 
-/**
- * Results for the quick-search palette: pages matched locally from the
- * sitemap, plus records matched by the API.
- *
- * Pages resolve instantly on the first keystroke while the debounced query is
- * still in flight, so the palette always has something to show; an empty term
- * falls back to offering the main pages rather than an empty panel.
- */
 export function useQuickSearch(term: string): {
   items: QuickSearchItem[];
   loading: boolean;
-  /** The term the current remote results correspond to. */
   debouncedTerm: string;
 } {
   const trimmed = term.trim();
   const [debouncedTerm, setDebouncedTerm] = useState('');
 
-  // Debounce so a query goes out per pause, not per keystroke.
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedTerm(trimmed), DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -91,15 +79,11 @@ export function useQuickSearch(term: string): {
   const { data, loading } = useGlobalSearchQuery({
     variables: { query: debouncedTerm },
     skip: !shouldQuery,
-    // The palette lists records that change under the user; a stale hit that
-    // dead-ends on click is worse than a moment's spinner.
     fetchPolicy: 'cache-and-network'
   });
 
   const items = useMemo<QuickSearchItem[]>(() => {
     const pages = matchPages(trimmed);
-    // Ignore results still describing an older term — otherwise the list
-    // flickers between the previous query's hits and the new one's.
     if (!shouldQuery || debouncedTerm !== trimmed) return pages;
 
     const remote = (data?.globalSearch ?? []).map(result => ({

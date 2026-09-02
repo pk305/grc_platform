@@ -137,7 +137,7 @@ export default function ForcePasswordChangeDialog() {
     <div className="d-flex min-vh-100 overflow-hidden">
       <PageTitle title="Set a New Password" />
       <div
-        className="d-flex flex-column justify-content-center position-relative bg-white flex-grow-1"
+        className="d-flex flex-column justify-content-center position-relative auth-panel flex-grow-1"
         style={{ flex: '1 1 45%' }}
       >
         <main

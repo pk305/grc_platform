@@ -21,27 +21,14 @@ import {
 
 export type ChatContact = ChatContactsQuery['chatContacts'][number];
 
-/** One conversation window docked along the bottom bar. */
 export interface ChatWindowState {
-  /** The colleague's user id — what the rail and the dock agree on. */
   contactId: string;
-  /** Null until the thread exists; the first message brings it into being. */
   conversationId: string | null;
   minimized: boolean;
 }
 
-/**
- * How many windows the dock will hold. Facebook's bar drops the oldest window
- * once the row would overflow; matching that keeps the composer reachable on a
- * laptop screen instead of pushing windows off the edge.
- */
 export const MAX_OPEN_WINDOWS = 3;
 
-/**
- * Keyed by user: the dock is restored from the browser, and one person's open
- * conversations must not reappear for whoever signs in on the same machine
- * next.
- */
 const windowsStorageKey = (userId: string) => `phoenix.chat.windows.${userId}`;
 
 interface ChatContextValue {
@@ -49,7 +36,6 @@ interface ChatContextValue {
   loading: boolean;
   windows: ChatWindowState[];
   unreadTotal: number;
-  /** Contacts rail visibility — remembered per browser, like the nav. */
   railOpen: boolean;
   toggleRail: () => void;
   openChat: (contactId: string) => void;
@@ -57,7 +43,6 @@ interface ChatContextValue {
   toggleMinimized: (contactId: string) => void;
   markRead: (contactId: string, conversationId: string) => void;
   contactById: (contactId: string) => ChatContact | undefined;
-  /** Records a thread created by a window's first message. */
   attachConversation: (contactId: string, conversationId: string) => void;
 }
 
@@ -80,8 +65,6 @@ function readStoredWindows(key: string): ChatWindowState[] {
           typeof entry.conversationId === 'string'
             ? entry.conversationId
             : null,
-        // Windows come back minimized: reloading into three open chat panes
-        // over the page you actually navigated to would be a nuisance.
         minimized: true
       }));
   } catch {
@@ -99,10 +82,6 @@ function readStoredRail(): boolean {
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth();
-  // `AuthGuard` holds this subtree back until the session has resolved, so the
-  // provider only ever mounts in the browser with a user in hand — the stored
-  // dock can be read straight into initial state, with no hydration to skew
-  // and no restoring pass afterwards.
   const storageKey = windowsStorageKey(user?.id ?? 'anonymous');
   const [windows, setWindows] = useState<ChatWindowState[]>(() =>
     readStoredWindows(storageKey)
@@ -110,24 +89,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [railOpen, setRailOpen] = useState(readStoredRail);
 
   const { data, loading } = useChatContactsQuery({
-    // One fetch for the initial list; the subscriptions below carry every
-    // update after that.
     fetchPolicy: 'cache-and-network',
     skip: !isAuthenticated
   });
 
-  // Each incoming row has an `id`, so Apollo's normalized cache merges it
-  // straight into the matching `ChatContactType` entity the query above
-  // already returned — no manual cache write needed here. Being subscribed
-  // is also what keeps this user's own chat socket open for as long as the
-  // tab is, which is what registers them as online to everyone else; there
-  // is no separate heartbeat call.
-  //
-  // This only ever fires because someone else just messaged *you* (see
-  // `chat.rail.update` in domains/chat/realtime.py) — never for your own
-  // sends or for read-state changes — so it doubles as exactly the signal a
-  // browser notification wants. Fired only while the tab is backgrounded:
-  // if it's in front of the user there's nothing a popup would add.
   useChatContactUpdatedSubscription({
     skip: !isAuthenticated,
     onData: ({ data: event }) => {
@@ -142,8 +107,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       }
       const notification = new Notification(contact.participant.name, {
         body: contact.lastMessagePreview || 'sent a message',
-        // Collapses rapid-fire messages from the same person into one
-        // updated popup instead of stacking a fresh one for each.
         tag: `chat-${contact.id}`
       });
       notification.onclick = () => {
@@ -154,10 +117,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  // Presence isn't keyed by a `ChatContactType` id, so it can't merge itself
-  // in automatically — patched by hand below, onto the shared
-  // `ChatParticipantType` entity (which every contact row, and every message
-  // bubble's sender, already points at).
   useChatPresenceChangedSubscription({
     skip: !isAuthenticated,
     onData: ({ client, data: event }) => {
@@ -176,12 +135,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [openConversation] = useOpenChatConversationMutation();
   const [markReadMutation] = useMarkChatReadMutation();
 
-  // The query's own row order is a snapshot from whenever it last fetched —
-  // a live `chatContactUpdated` patches a row's fields in place (Apollo
-  // reactivity re-derives `data` for that alone) but never reshuffles the
-  // array, so re-sorting here is what makes a colleague who just messaged
-  // you actually jump to the top instead of waiting for a future reload.
-  // Mirrors the sort `contacts()` does server-side (domains/chat/service.py).
   const contacts = useMemo(() => {
     const rows = data?.chatContacts ?? [];
     return [...rows].sort((a, b) => {
@@ -198,27 +151,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     });
   }, [data]);
 
-  // The rail is fixed-position, so the page has to be told to leave it a
-  // gutter; a class on <html> is how the vertical navbar does the same thing.
   useEffect(() => {
     const html = document.documentElement;
     html.classList.toggle('chat-rail-open', railOpen);
-    // Signing out unmounts the provider; without this the gutter would still
-    // be reserved on the auth pages, which have no rail to put in it.
     return () => html.classList.remove('chat-rail-open');
   }, [railOpen]);
 
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(windows));
-    } catch {
-      // A browser refusing storage costs the dock its memory, nothing more.
-    }
+    } catch {}
   }, [storageKey, windows]);
 
-  // Asked once per browser, not on every sign-in: 'default' is the only
-  // state a prompt can still change — 'granted' and 'denied' are both
-  // final until the user resets it themselves.
   useEffect(() => {
     if (!isAuthenticated) return;
     if (typeof Notification === 'undefined') return;
@@ -232,9 +176,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const next = !open;
       try {
         localStorage.setItem(RAIL_STORAGE_KEY, String(next));
-      } catch {
-        // Preference is cosmetic; losing it is survivable.
-      }
+      } catch {}
       return next;
     });
   }, []);
@@ -254,10 +196,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     (contactId: string, conversationId: string) => {
       markReadMutation({
         variables: { conversationId },
-        // The badge is summed from the rail's contacts, so zeroing this row is
-        // what actually clears it — without waiting for the next poll. Edited
-        // by cache id rather than by rewriting the query, so it holds however
-        // the rail happened to be filtered when the message arrived.
         update: cache => {
           cache.modify({
             id: cache.identify({
@@ -277,8 +215,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setWindows(current => {
         const existing = current.find(entry => entry.contactId === contactId);
         if (existing) {
-          // Clicking a name again brings that window back rather than opening
-          // a second one.
           return current.map(entry =>
             entry.contactId === contactId
               ? { ...entry, minimized: false }
@@ -292,7 +228,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               ?.conversationId ?? null,
           minimized: false
         };
-        // Newest on the right, oldest dropped once the bar is full.
         return [...current, opened].slice(-MAX_OPEN_WINDOWS);
       });
 

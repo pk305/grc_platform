@@ -17,8 +17,6 @@
   padding-right: 1rem;
 }
 
-// DataTables (datatables.net) "display" theme: bordered rows, zebra
-// striping, and a hover highlight on the current row.
 .dt-table {
   width: 100%;
   --table-border-radius: 0;
@@ -62,15 +60,6 @@
   animation: skeleton-shimmer 1.6s ease-in-out infinite;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                          Quick search (⌘K palette)                          */
-/* -------------------------------------------------------------------------- */
-
-/*
- * Own tokens rather than the theme's: the palette floats above the page on a
- * translucent panel, so it needs its own surface and border values in both
- * themes. `.dark` is the class the ThemeProvider puts on <html>.
- */
 :root {
   --qs-backdrop: rgba(34, 40, 52, 0.28);
   --qs-surface: rgba(255, 255, 255, 0.92);
@@ -97,8 +86,6 @@
   --qs-kbd-bg: rgba(255, 255, 255, 0.08);
 }
 
-/* ------------------------------- The trigger ------------------------------ */
-
 .qs-trigger {
   display: flex;
   align-items: center;
@@ -107,11 +94,18 @@
   text-align: left;
   cursor: pointer;
   color: var(--qs-faint);
-  /* .search-input reserves 2rem on the right for a clear button this has no
-     use for; reclaim it so the ⌘K hint sits against the edge. */
   padding-right: 0.5rem;
+  background: var(--qs-surface);
+  border-color: var(--qs-border);
 
   &:hover {
+    border-color: var(--qs-accent);
+  }
+
+  &:focus,
+  &:focus-visible {
+    color: var(--qs-faint);
+    background: var(--qs-surface);
     border-color: var(--qs-accent);
   }
 }
@@ -132,19 +126,12 @@
   color: var(--qs-muted);
 }
 
-/* -------------------------------- The palette ------------------------------ */
-
 .qs-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1080; /* above Bootstrap's modal-backdrop (1050) */
+  z-index: 1080;
   display: flex;
   justify-content: center;
-  /*
-   * Biased above centre rather than dead centre: it lands closer to where the
-   * eye already is, and leaves room for the list to grow downward without the
-   * panel shifting under the pointer.
-   */
   align-items: flex-start;
   padding: 14vh 1rem 1rem;
   background: var(--qs-backdrop);
@@ -165,11 +152,9 @@
   border-radius: 0.875rem;
   border: 1px solid var(--qs-border);
   background: var(--qs-surface);
-  /* Vibrancy: the page behind shows through, softened. */
   backdrop-filter: blur(24px) saturate(180%);
   box-shadow: var(--qs-shadow);
   color: var(--qs-text);
-  /* Expo-out — the settled, slightly overshoot-free feel of macOS panels. */
   animation: qs-panel-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 
   &[data-state='exiting'] {
@@ -181,7 +166,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.75;
   padding: 0 1.125rem;
   height: 3.75rem;
   flex: none;
@@ -248,7 +233,6 @@
   padding: 0.5rem 0.625rem;
   border-radius: 0.5rem;
   cursor: pointer;
-  /* Colour only — no transform, so a fast arrow-key run doesn't shimmer. */
   transition: background-color 90ms linear;
 
   &.is-active {
@@ -371,10 +355,6 @@
   }
 }
 
-/*
- * Respect the OS setting: the palette still appears and dismisses, it just
- * stops moving and scaling to get there.
- */
 @media (prefers-reduced-motion: reduce) {
   .qs-backdrop,
   .qs-panel {

@@ -223,3 +223,63 @@ $theme-hover-colors: (
 );
 
 $button-colors: map.remove($theme-colors, 'light', 'dark');
+
+//*-----------------------------------------------
+//|   Dark mode neutrals
+//-----------------------------------------------*/
+// Companion to $grays for `.dark`: same numeric keys, but running from
+// darkest (100, page background) to lightest (900/1000, heading text) since
+// that's the direction root/_dark.scss's map.get($dark-grays, ...) calls
+// actually consume them in. 100-500 anchor to the values already shipped in
+// _chat.scss's dark palette so the two systems don't disagree.
+$dark-100: #0b1727 !default; // page background
+$dark-200: #101d2c !default; // raised surface (body, dropdown-bg)
+$dark-300: #16233a !default; // card/dropdown borders, striped rows
+$dark-400: #1e2c42 !default; // borders, kanban attachment bg
+$dark-500: #2a3b4d !default; // mid surface (matches --chat-bubble-theirs-bg)
+$dark-600: #46536a !default; // muted / disabled text
+$dark-700: #c7ccd6 !default; // primary body text
+$dark-800: #dbe0e8 !default; // emphasised text
+$dark-900: #eff2f6 !default; // headings (matches --chat-text / $gray-100)
+$dark-1000: #f8f9fb !default; // hover / brightest text
+
+$dark-grays: (
+  '100': $dark-100,
+  '200': $dark-200,
+  '300': $dark-300,
+  '400': $dark-400,
+  '500': $dark-500,
+  '600': $dark-600,
+  '700': $dark-700,
+  '800': $dark-800,
+  '900': $dark-900,
+  '1000': $dark-1000
+) !default;
+
+$theme-dark-colors: () !default;
+$theme-dark-colors: map.merge(
+  (
+    'primary': $blue-300,
+    'secondary': $dark-600,
+    'success': $green-300,
+    'info': $cyan-300,
+    'warning': $orange-300,
+    'danger': $red-300,
+    'light': $dark-300,
+    'dark': $dark-100
+  ),
+  $theme-dark-colors
+);
+
+$theme-dark-colors-soft: () !default;
+$theme-dark-colors-soft: map.merge(
+  (
+    'primary': rgba($blue, 0.18),
+    'secondary': rgba($dark-600, 0.35),
+    'success': rgba($green, 0.18),
+    'info': rgba($cyan, 0.18),
+    'warning': rgba($orange, 0.18),
+    'danger': rgba($red, 0.18)
+  ),
+  $theme-dark-colors-soft
+);

@@ -1,6 +1,25 @@
 //
 // Headings
 //
+// Bootstrap's own reboot bakes $headings-color in as a fixed value at build
+// time, so it never responds to the runtime `.dark` class toggle — this
+// re-points headings at the CSS custom property root/_light.scss and
+// root/_dark.scss both keep in step with the theme.
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.h1,
+.h2,
+.h3,
+.h4,
+.h5,
+.h6 {
+  color: var(--#{$variable-prefix}headings-color);
+}
+
 h1,
 .h1 {
   font-weight: $font-weight-bolder;

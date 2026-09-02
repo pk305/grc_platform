@@ -180,9 +180,38 @@
   @include media-breakpoint-up(sm) {
     height: $footer-height;
   }
-  border-top: 1px solid $gray-300;
+  border-top: 1px solid var(--#{$variable-prefix}border-color);
   padding: 0 map.get($spacers, 6);
   left: 0;
+}
+
+// A themed stand-in for Bootstrap's `bg-white` utility, which is always
+// literally white regardless of theme — used by the global toast
+// (components/common/Toast.tsx) so it doesn't disappear into a dark page.
+.bg-surface {
+  background-color: var(--#{$variable-prefix}card-bg, #{$white});
+}
+
+// The primary panel on every auth screen (sign in, SSO, reset password, MFA
+// setup, forced password change) — same `bg-white` problem as .bg-surface
+// above, plus a couple of auth-specific pieces (.divider-content-center)
+// that need the same treatment. Its .text-900/800/700/600 copy is already
+// covered by the app-wide numbered-gray override in root/_dark.scss.
+.auth-panel {
+  // --phoenix-card-bg only exists where Bootstrap's .card sets it locally (or
+  // root/_dark.scss's `.dark` override); it's never defined at :root, so a
+  // plain var() here would fall through to transparent in light mode — the
+  // explicit fallback keeps this panel white outside of `.dark`, same as the
+  // `bg-white` it replaced.
+  background-color: var(--#{$variable-prefix}card-bg, #{$white});
+
+  // .divider-content-center paints over the <hr> behind it with $body-bg —
+  // fine on the plain page background it was designed for, but this panel's
+  // own background no longer matches that once .dark is active.
+  .divider-content-center {
+    background-color: var(--#{$variable-prefix}card-bg, #{$white});
+    color: var(--#{$variable-prefix}600);
+  }
 }
 
 .bullet-item {
