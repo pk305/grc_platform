@@ -83,7 +83,8 @@ export const AUDIT_EVENT_LABEL: Record<string, string> = {
   'mfa.codes_regenerated': 'Recovery codes regenerated',
   'profile.updated': 'Profile updated',
   'sso.sign_in': 'Sign-in',
-  'login.failed': 'Sign-in failed'
+  'login.failed': 'Sign-in failed',
+  'settings.updated': 'System settings updated'
 };
 
 export const AUDIT_EVENT_COLOR: Record<
@@ -105,7 +106,8 @@ export const AUDIT_EVENT_COLOR: Record<
   'mfa.codes_regenerated': 'blue',
   'profile.updated': 'blue',
   'sso.sign_in': 'blue',
-  'login.failed': 'amber'
+  'login.failed': 'amber',
+  'settings.updated': 'amber'
 };
 
 export function auditEventLabel(eventType: string): string {

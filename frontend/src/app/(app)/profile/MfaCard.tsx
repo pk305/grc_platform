@@ -15,10 +15,10 @@ import {
   useBeginMfaSetupMutation,
   useDisableMfaMutation
 } from '@/features/auth/__generated__/queries.generated';
+import { SectionCard } from '@/components/common/SectionCard';
 import { useRegenerateMfaRecoveryCodesMutation } from '@/features/profile/__generated__/queries.generated';
 import { MfaEnrollForm } from '@/features/auth/MfaEnrollForm';
 import { RecoveryCodesGrid } from '@/features/auth/RecoveryCodesGrid';
-import { SectionCard } from './SectionCard';
 import type { ProfileUser } from './types';
 
 const REFETCH = ['MyProfile', 'Me', 'MyAuditEvents'];

@@ -18,6 +18,8 @@ from domains.notifications.graphql.queries import NotificationsQuery
 from domains.obligations.graphql.queries import ObligationsQuery
 from domains.risk.graphql.mutations import RiskMutation
 from domains.risk.graphql.queries import RiskQuery
+from domains.system.graphql.mutations import SystemMutation
+from domains.system.graphql.queries import SystemQuery
 
 
 @strawberry.type
@@ -30,13 +32,14 @@ class Query(
     ObligationsQuery,
     NotificationsQuery,
     ChatQuery,
+    SystemQuery,
     SearchQuery,
 ):
     pass
 
 
 @strawberry.type
-class Mutation(IamMutation, RiskMutation, NotificationsMutation, ChatMutation):
+class Mutation(IamMutation, RiskMutation, NotificationsMutation, ChatMutation, SystemMutation):
     pass
 
 

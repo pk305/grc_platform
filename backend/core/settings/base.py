@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "domains.obligations",
     "domains.notifications",
     "domains.chat",
+    "domains.system",
 ]
 
 MIDDLEWARE = [
@@ -86,7 +87,9 @@ AUTH_USER_MODEL = "iam.User"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    # Minimum length is administrator-configurable (see domains.system), so the
+    # stock MinimumLengthValidator is replaced rather than added to.
+    {"NAME": "domains.system.validators.ConfiguredMinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]

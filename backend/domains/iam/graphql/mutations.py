@@ -1,5 +1,4 @@
 import secrets
-from datetime import timedelta
 from typing import Annotated
 
 import pyotp
@@ -35,6 +34,13 @@ from domains.iam.models import (
     UserAvatar,
 )
 from domains.iam.permissions import require_roles
+from domains.system.service import (
+    apply_global_mfa_requirement,
+    effective_login_domain,
+    mfa_required_for_new_user,
+    next_access_review_date,
+    session_expiry_seconds,
+)
 
 from .types import (
     AssignRoleInput,
@@ -64,10 +70,6 @@ class MfaRequired:
 
 LoginResult = Annotated[UserType | AuthError | MfaRequired, strawberry.union("LoginResult")]
 
-# Session keys tracking a password-verified-but-not-yet-MFA-verified sign-in.
-# `auth_login()` is deliberately NOT called until the code is verified, so
-# the session stays anonymous (no access to authenticated fields/mutations)
-# until MFA passes.
 MFA_PENDING_USER_KEY = "mfa_pending_user_id"
 MFA_PENDING_ATTEMPTS_KEY = "mfa_pending_attempts"
 MAX_MFA_ATTEMPTS = 5
@@ -84,8 +86,6 @@ async def _clear_mfa_challenge(request) -> None:
 
 
 async def _session_get(request, key: str, default=None):
-    # Django's session store lazily hits the DB on first access — never
-    # touch request.session directly from an async resolver.
     return await sync_to_async(request.session.get)(key, default)
 
 
@@ -94,17 +94,12 @@ async def _session_set(request, key: str, value) -> None:
 
 
 def _enforce_single_session(request, user: User) -> None:
-    """Logs the user in, then evicts any session already open elsewhere.
-
-    ISO/IEC 27001:2022 A.8.5 — limitation of concurrent sessions: only one
-    active session per account. `auth_login` cycles the request's own session
-    key (Django's session-fixation protection), so the previous key recorded
-    on the user is always a *different* browser/device's session; deleting
-    that row invalidates its sessionid cookie for both the HTTP API and the
-    chat websocket, which authenticate off the same session store.
-    """
+    """Logs the user in, then evicts any session already open elsewhere."""
     previous_key = user.current_session_key
     auth_login(request, user)
+    # A.8.5 — sign-ins expire on the administrator's schedule, not Django's
+    # two-week cookie default. Set after auth_login, which cycles the session.
+    request.session.set_expiry(session_expiry_seconds())
     new_key = request.session.session_key
     if previous_key and previous_key != new_key:
         Session.objects.filter(session_key=previous_key).delete()
@@ -170,29 +165,21 @@ def _client_ip(request) -> str | None:
     return request.META.get("REMOTE_ADDR")
 
 
-# ISO/IEC 27001:2022 A.5.18 — new access is recertified on a fixed cadence,
-# not left unscheduled until someone remembers to trigger a review.
-NEW_USER_ACCESS_REVIEW_DAYS = 90
-
-
 @strawberry.type
 class IamMutation:
     @strawberry.mutation
     async def login(self, info: Info, email: str, password: str) -> LoginResult:
         request = info.context.request
-        # request.META is a plain dict, unlike request.user/.session — safe
-        # to read straight off the event loop, no sync_to_async needed.
         ip_address = _client_ip(request)
         email = email.strip().lower()
         domain = email.rsplit("@", 1)[-1]
         allowed_emails = {e.lower() for e in settings.ALLOWED_LOGIN_EMAILS}
-        if email not in allowed_emails and domain != settings.ALLOWED_LOGIN_DOMAIN.lower():
+        allowed_domain = await sync_to_async(effective_login_domain)()
+        if email not in allowed_emails and domain != allowed_domain:
             await sync_to_async(LoginAttempt.objects.create)(
                 email=email, success=False, ip_address=ip_address
             )
-            return AuthError(
-                message=f"Only @{settings.ALLOWED_LOGIN_DOMAIN} accounts can sign in here."
-            )
+            return AuthError(message=f"Only @{allowed_domain} accounts can sign in here.")
 
         user = await sync_to_async(authenticate)(request, username=email, password=password)
         if user is None:
@@ -206,6 +193,7 @@ class IamMutation:
             await _session_set(request, MFA_PENDING_ATTEMPTS_KEY, 0)
             return MfaRequired()
 
+        await sync_to_async(apply_global_mfa_requirement)(user)
         await sync_to_async(_enforce_single_session)(request, user)
         await sync_to_async(LoginAttempt.objects.create)(
             email=email, user=user, success=True, ip_address=ip_address
@@ -247,9 +235,6 @@ class IamMutation:
     @strawberry.mutation
     async def logout(self, info: Info) -> bool:
         request = info.context.request
-        # `request.user` is a lazy object that hits the DB to resolve —
-        # evaluating it outside sync_to_async would run that query straight
-        # on the event loop.
         await sync_to_async(_clear_current_session_key_sync)(request)
         await sync_to_async(auth_logout)(request)
         return True
@@ -550,10 +535,9 @@ class IamMutation:
                 first_name=data.first_name,
                 last_name=data.last_name,
                 department=data.department,
-                mfa_required=data.require_mfa,
+                mfa_required=mfa_required_for_new_user(data.require_mfa),
                 must_change_password=True,
-                next_access_review_date=timezone.now().date()
-                + timedelta(days=NEW_USER_ACCESS_REVIEW_DAYS),
+                next_access_review_date=next_access_review_date(timezone.now().date()),
             )
             user.set_password(data.password)
             user.full_clean(exclude=["password"])

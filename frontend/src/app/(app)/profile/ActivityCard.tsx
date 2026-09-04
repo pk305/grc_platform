@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { Badge, Box, Button, Flex, Text } from '@radix-ui/themes';
+import { SectionCard } from '@/components/common/SectionCard';
 import { useMyAuditEventsQuery } from '@/features/profile/__generated__/queries.generated';
 import { AUDIT_EVENT_COLOR, auditEventLabel } from '@/lib/iam-roles';
-import { SectionCard } from './SectionCard';
 
 const PAGE_SIZE = 25;
 

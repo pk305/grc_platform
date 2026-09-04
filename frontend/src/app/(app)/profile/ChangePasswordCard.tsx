@@ -7,9 +7,9 @@ import {
   PasswordRequirement,
   PasswordStrengthMeter
 } from '@/components/common/PasswordStrength';
+import { SectionCard } from '@/components/common/SectionCard';
 import { useChangePasswordMutation } from '@/features/auth/__generated__/queries.generated';
 import { MIN_PASSWORD_LENGTH, isCommonPassword } from '@/lib/password';
-import { SectionCard } from './SectionCard';
 import type { ProfileUser } from './types';
 
 const MESSAGES = {

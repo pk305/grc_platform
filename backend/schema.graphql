@@ -302,6 +302,7 @@ type Mutation {
   markChatRead(conversationId: ID!): ChatReadResult!
   setChatTyping(conversationId: ID!, typing: Boolean!): Boolean!
   startChatCall(recipientId: ID!, video: Boolean!): ChatCallResult!
+  updateSystemSettings(data: SystemSettingInput!): UpdateSystemSettingsPayload! @requireRoles
 }
 
 input MyProfileInput {
@@ -401,6 +402,7 @@ type Query {
   chatContacts(search: String = null, limit: Int = null): [ChatContactType!]!
   chatMessages(conversationId: ID!, limit: Int = null): [ChatMessageType!]!
   chatUnreadTotal: Int!
+  systemSettings: SystemSettingType! @requireRoles
   globalSearch(query: String!, limit: Int! = 5): [SearchResult!]!
 }
 
@@ -588,9 +590,76 @@ type Subscription {
   sessionInvalidated: Boolean!
 }
 
+input SystemSettingInput {
+  organisationName: String
+  primaryContactEmail: String
+  allowedLoginDomain: String
+  requireMfaForAllUsers: Boolean
+  sessionExpiryMinutes: Int
+  passwordMinLength: Int
+  accessReviewIntervalDays: Int
+  auditLogRetentionDays: Int
+}
+
+"""
+The single row of platform configuration (ISO/IEC 27001:2022 A.5.1).
+
+One row of typed columns rather than a key/value table, so every setting
+gets model validation, a help text the GraphQL schema publishes, and a
+migration when it changes. Read it through `load()` — it creates the row on
+first access, so callers never have to care whether it exists yet.
+
+A setting only lives here if something enforces it; see `service.py` for
+the accessors that apply these to sign-in, user creation and retention.
+"""
+type SystemSettingType {
+  id: ID!
+
+  """
+  Organisation this platform governs. Used in the emails the platform sends.
+  """
+  organisationName: String!
+
+  """Where users are told to turn for access problems."""
+  primaryContactEmail: String!
+
+  """
+  Email domain an account must belong to in order to sign in. Leave blank to keep using the ALLOWED_LOGIN_DOMAIN environment value.
+  """
+  allowedLoginDomain: String!
+
+  """
+  Every account without MFA is asked to enroll at its next sign-in and cannot use the platform until it does (A.8.5).
+  """
+  requireMfaForAllUsers: Boolean!
+
+  """
+  How long a sign-in stays valid before the user must authenticate again.
+  """
+  sessionExpiryMinutes: Int!
+
+  """Minimum characters for a new password (A.5.17)."""
+  passwordMinLength: Int!
+
+  """
+  How far ahead a new account's first access recertification is scheduled (A.5.18).
+  """
+  accessReviewIntervalDays: Int!
+
+  """
+  How long IAM audit events and sign-in attempts are kept before `purge_audit_log` deletes them (A.8.15).
+  """
+  auditLogRetentionDays: Int!
+  updatedAt: DateTime!
+  effectiveLoginDomain: String!
+  updatedByEmail: String
+}
+
 union UpdateMyAvatarPayload = UserType | OperationInfo
 
 union UpdateMyProfilePayload = UserType | OperationInfo
+
+union UpdateSystemSettingsPayload = SystemSettingType | OperationInfo
 
 union UpdateUserPayload = UserType | OperationInfo
 

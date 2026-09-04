@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { Badge, Box, DataList, Flex, Grid, Text } from '@radix-ui/themes';
+import { SectionCard } from '@/components/common/SectionCard';
 import { useMyPermissionsQuery } from '@/features/profile/__generated__/queries.generated';
 import {
   accessReviewStatus,
@@ -11,7 +12,6 @@ import {
   roleDescription,
   roleLabel
 } from '@/lib/iam-roles';
-import { SectionCard } from './SectionCard';
 import type { ProfileUser } from './types';
 
 function formatDate(value: string | null | undefined): string {

@@ -94,12 +94,7 @@ class IamQuery:
 
     @strawberry_django.field
     def my_audit_events(self, info: Info, limit: int = 25) -> list[AuditEventType]:
-        """The signed-in user's own account trail.
-
-        Scoped to events the caller is the actor or the subject of, plus their
-        own sign-in attempts — so the account holder can see what is recorded
-        about them (A.5.34) without being granted the tenant-wide log (A.8.15).
-        """
+        """The signed-in user's own account trail."""
         user = info.context.request.user
         if not user.is_authenticated:
             return []

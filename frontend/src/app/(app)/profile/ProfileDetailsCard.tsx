@@ -12,9 +12,9 @@ import {
   Text,
   TextField
 } from '@radix-ui/themes';
+import { SectionCard } from '@/components/common/SectionCard';
 import { useUpdateMyProfileMutation } from '@/features/profile/__generated__/queries.generated';
 import { AUTH_PROVIDER_LABEL } from '@/lib/iam-roles';
-import { SectionCard } from './SectionCard';
 import type { ProfileUser } from './types';
 
 /**

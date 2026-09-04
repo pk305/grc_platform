@@ -1,0 +1,35 @@
+fragment SystemSettingFields on SystemSettingType {
+  id
+  organisationName
+  primaryContactEmail
+  allowedLoginDomain
+  effectiveLoginDomain
+  requireMfaForAllUsers
+  sessionExpiryMinutes
+  passwordMinLength
+  accessReviewIntervalDays
+  auditLogRetentionDays
+  updatedAt
+  updatedByEmail
+}
+
+query SystemSettings {
+  systemSettings {
+    ...SystemSettingFields
+  }
+}
+
+mutation UpdateSystemSettings($data: SystemSettingInput!) {
+  updateSystemSettings(data: $data) {
+    __typename
+    ... on SystemSettingType {
+      ...SystemSettingFields
+    }
+    ... on OperationInfo {
+      messages {
+        field
+        message
+      }
+    }
+  }
+}

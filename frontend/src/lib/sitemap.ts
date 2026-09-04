@@ -29,7 +29,8 @@ export const sitemap: SitemapPage[] = [
           { name: 'Permissions', path: '/iam/permissions' },
           { name: 'Audit Log', path: '/iam/audit-log' }
         ]
-      }
+      },
+      { name: 'System Settings', icon: 'settings', path: '/settings/system' }
     ]
   }
 ];
